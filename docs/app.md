@@ -41,7 +41,7 @@ iPhone не принимает Coded PHY. Приложение под iOS раб
 
 ## Источники
 
-- [Everytag](https://github.blesdmm.dns-dynamic.net/vasimv/Everytag), [macless-haystack](https://github.com/dchristl/macless-haystack)
+- [Everytag](https://github.com/vasimv/Everytag), [macless-haystack](https://github.com/dchristl/macless-haystack)
 - [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools), [обзор CNX Software](https://www.cnx-software.com/2025/02/12/googlefindmytools-locates-esp32-based-trackers-using-google-find-my-device-network/)
 - [Coded PHY на Android: Apple Developer Forums](https://developer.apple.com/forums/thread/131506), [Google Issue Tracker](https://issuetracker.google.com/issues/148487283), [DevZone: флаг поддержки](https://devzone.nordicsemi.com/f/nordic-q-a/70038/android-nrf-connect---proper-indication-of-coded-phy-support)
 - [Тест дальности Coded PHY, Nordic](https://blog.nordicsemi.com/getconnected/tested-by-nordic-bluetooth-long-range)

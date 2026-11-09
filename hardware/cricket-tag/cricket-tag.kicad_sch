@@ -7,7 +7,7 @@
 	(title_block
 		(title "Cricket Tag")
 		(rev "A")
-		(comment 1 "Ultra-light BLE crash beacon, nRF54L15 (Ezurio BL54L15u)")
+		(comment 1 "Ultra-light BLE crash beacon, u-blox ANNA-B402 (nRF52833)")
 	)
 	(lib_symbols)
 	(sheet_instances

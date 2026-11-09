@@ -19,8 +19,10 @@ $KICAD_CLI sch erc  hardware/cricket-tag/cricket-tag.kicad_sch -o /tmp/erc.rpt
 $KICAD_CLI pcb drc  hardware/cricket-tag/cricket-tag.kicad_pcb -o /tmp/drc.rpt
 $KICAD_CLI pcb export gerbers hardware/cricket-tag/cricket-tag.kicad_pcb -o hardware/cricket-tag/fab/gerbers/
 $KICAD_CLI pcb export drill   hardware/cricket-tag/cricket-tag.kicad_pcb -o hardware/cricket-tag/fab/gerbers/
-$KICAD_CLI pcb export pos     hardware/cricket-tag/cricket-tag.kicad_pcb -o hardware/cricket-tag/fab/cpl.csv --format csv --units mm
-$KICAD_CLI sch export bom     hardware/cricket-tag/cricket-tag.kicad_sch -o hardware/cricket-tag/fab/bom.csv
+$KICAD_CLI pcb export pos     hardware/cricket-tag/cricket-tag.kicad_pcb -o hardware/cricket-tag/fab/cpl.csv --format csv --units mm --side front
+$KICAD_CLI sch export bom     hardware/cricket-tag/cricket-tag.kicad_sch -o hardware/cricket-tag/fab/bom.csv \
+  --fields "Value,Reference,Footprint,LCSC Part" --labels "Comment,Designator,Footprint,LCSC Part #" \
+  --group-by "Value,Footprint,LCSC Part" --ref-range-delimiter "" --exclude-dnp
 ```
 
 Плагины KiCad ставятся через Plugin and Content Manager в GUI: Interactive HTML BOM, Fabrication Toolkit (JLCPCB BOM/CPL), библиотека Espressif (для seeker, если понадобится ESP32).
@@ -65,7 +67,7 @@ nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54
 
 - J-Link (включая встроенный в nRF52833-DK): `west flash` или `nrfutil device program --firmware build/zephyr/zephyr.hex`.
 - Любой CMSIS-DAP / J-Link через probe-rs: `probe-rs run --chip nRF52833_xxAA build/zephyr/zephyr.elf`.
-- Для cricket-tag нужен адаптер с pogo-pin на 4 пятачка SWD.
+- Для cricket-tag нужен кабель Tag-Connect TC2030-NL: 6 подпружиненных контактов на площадки SWD без отверстий.
 
 ## Что установлено (проверено 2026-11-09)
 
