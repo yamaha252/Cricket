@@ -67,7 +67,7 @@ nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54
 
 - J-Link (включая встроенный в nRF52833-DK): `west flash` или `nrfutil device program --firmware build/zephyr/zephyr.hex`.
 - Любой CMSIS-DAP / J-Link через probe-rs: `probe-rs run --chip nRF52833_xxAA build/zephyr/zephyr.elf`.
-- Для cricket-tag нужен кабель Tag-Connect TC2030-NL: 6 подпружиненных контактов на площадки SWD без отверстий.
+- У cricket-tag площадки SWD J3 снизу под аккумулятором: 1 VDD, 2 SWDIO, 3 SWCLK, 4 GND, шаг 2,54 мм, без отверстий. Прошивать до пайки аккумулятора, подпружиненными контактами или временными проводами (D-26).
 
 ## Что установлено (проверено 2026-11-09)
 

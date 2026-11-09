@@ -303,5 +303,13 @@
       "Root"
     ]
   ],
-  "text_variables": {}
+  "text_variables": {},
+  "erc": {
+    "erc_exclusions": [
+      [
+        "pin_to_pin|3302000|660400|c0449ae4-a6a0-50c6-8696-0d6ccb1671df|b64836a3-1948-585c-9724-c3a3fb72fe51|/56dee62f-8129-4e4a-ba8f-7a3ded8abe6b/|/56dee62f-8129-4e4a-ba8f-7a3ded8abe6b/|/56dee62f-8129-4e4a-ba8f-7a3ded8abe6b/",
+        "LIS2DH12 SA0 намеренно на +3V3: адрес 0x19, нет тока через внутреннюю подтяжку SA0"
+      ]
+    ]
+  }
 }

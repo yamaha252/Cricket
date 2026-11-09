@@ -5,10 +5,14 @@
 План:
 
 - Zephyr / nRF Connect SDK v2.8.0 (см. раздел «Версия SDK»), модуль u-blox ANNA-B402 (nRF52833, 512 КБ флеш, 128 КБ ОЗУ). Пока нет своего board definition, сборка под `nrf52833dk/nrf52833`.
+- Выводы модуля: карта в [hardware/cricket-tag/README.md](../hardware/cricket-tag/README.md#схема) (D-24). NFC-выводы перевести в GPIO (`CONFIG_NFCT_PINS_AS_GPIOS`).
 - Apple Find My и Google Find Hub: интеграция Everytag.
 - Свои наборы рекламы: Cricket Coded (Coded PHY S8, +8 dBm, подключаемый) и Cricket 1M для телефонов без Coded PHY.
 - Режимы ON_DRONE, ESCALATE, ALARM, BEACON, STANDBY, LOW_BAT, SHIP.
 - Признаки падения: MSP_STATUS (armed) по UART, удар по LIS2DH12, нарастание тревоги как запасной вариант.
+- LIS2DH12 на I2C по адресу 0x19 (SA0 на VDD_IO), прерывание по удару на INT1 (ACC_INT1).
+- Пищалка: ШИМ на BUZ_DIN, режим PAM8904E выводами BUZ_EN1/BUZ_EN2. У CPT-1117-83 (D-27) громкость высокая широкой полосой 3–8 кГц: частоту или качание частоты подобрать замером.
+- Без 5 В от полётника вывод UART_TX перевести во вход, чтобы не питать полётник через его защитные диоды.
 - Радио выключено, пока дрон armed: не мешать ELRS 2,4 ГГц.
 - Чтение GPS с полётника по MSP, последние координаты в рекламе Cricket.
 - Кнопка: выключение тревоги, привязка, режим хранения, загрузчик.

@@ -19,7 +19,11 @@ cricket.kicad_sym; другие символы библиотеки не тро�
 """
 
 import os
+import sys
 import uuid
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from symlib import upsert_symbol  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NS = uuid.UUID("6f1c2a7e-3c1d-4b8e-9a51-0c0ffee0b402")
@@ -292,54 +296,10 @@ def symbol():
     return "\n".join(o) + "\n"
 
 
-def sexpr_block(text, start):
-    """Конец s-выражения, начинающегося с '(' в позиции start (строки учитываются)."""
-    depth, i, in_str = 0, start, False
-    while i < len(text):
-        ch = text[i]
-        if in_str:
-            if ch == "\\":
-                i += 1
-            elif ch == '"':
-                in_str = False
-        elif ch == '"':
-            in_str = True
-        elif ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-            if depth == 0:
-                return i + 1
-        i += 1
-    raise ValueError("unbalanced s-expression")
-
-
-def write_symbol(path):
-    """Пишет символ в библиотеку; другие символы в файле не трогает."""
-    new_lib = symbol()
-    if not os.path.exists(path):
-        with open(path, "w") as fh:
-            fh.write(new_lib)
-        return
-    s = new_lib.index('\t(symbol "ANNA-B402"')
-    new_block = new_lib[s:sexpr_block(new_lib, s + 1)]
-    with open(path) as fh:
-        text = fh.read()
-    key = '(symbol "ANNA-B402"'
-    if key in text:
-        s = text.index(key)
-        text = text[:s] + new_block.lstrip("\t") + text[sexpr_block(text, s):]
-    else:
-        e = text.rstrip().rindex(")")
-        text = text[:e] + new_block + "\n" + text[e:]
-    with open(path, "w") as fh:
-        fh.write(text)
-
-
 if __name__ == "__main__":
     pretty = os.path.join(HERE, "cricket.pretty")
     os.makedirs(pretty, exist_ok=True)
     with open(os.path.join(pretty, "ANNA-B402_CornerAntenna.kicad_mod"), "w") as fh:
         fh.write(footprint())
-    write_symbol(os.path.join(HERE, "cricket.kicad_sym"))
+    upsert_symbol(os.path.join(HERE, "cricket.kicad_sym"), "ANNA-B402", symbol())
     print("ok")
