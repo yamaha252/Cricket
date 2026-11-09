@@ -13,17 +13,19 @@ Read the docs before proposing parts, topology or behaviour changes. They record
 - `docs/concept.md` — architecture, schematic notes, operating modes, radio, energy budget.
 - `docs/components.md` — BOM source of truth until the schematic exists: LCSC codes, passive values, antenna keep-out geometry, mass.
 - `docs/manufacturing.md` — JLCPCB full-assembly rules.
+- `docs/cost.md` — production cost per batch size (~17.0 $ per board at 24 pcs, ~11.8 $ at 120 pcs); first order is a test batch of 8 boards (2 × 2 panel, ~230 $, D-21).
+- `docs/module-options.md` — radio modules from JLCPCB stock and bare nRF54L10 (rejected for rev A, D-19).
 - `docs/app.md` — Find My / Find Hub and the Android app.
 
 Priorities, in order: weight and size, power, range. Expected line-of-sight range on the small board: 150–250 m on 1M, 300–500 m on Coded PHY (D-17).
 
 ## Fixed decisions
 
-- MCU/radio: **u-blox ANNA-B402-00B** (Nordic nRF52833, 6.5 × 6.5 mm SiP, internal chip antenna, +8 dBm), bought by JLCPCB via Global Sourcing from Mouser (D-15). The owner rejected consigning parts, so every part must come from JLCPCB stock or Global Sourcing. Use the internal antenna exactly per the u-blox reference design (ANT→ANT_INT, corner placement, counterpoise on ANT_PCB). External 32.768 kHz crystal (D-16). Do not propose ESP32 or bare-chip RF for rev A.
+- MCU/radio (Ebyte E73 from JLCPCB stock was considered and rejected by the owner, D-19): **u-blox ANNA-B402-00B** (Nordic nRF52833, 6.5 × 6.5 mm SiP, internal chip antenna, +8 dBm), bought by JLCPCB via Global Sourcing from Mouser (D-15). The owner rejected consigning parts, so every part must come from JLCPCB stock or Global Sourcing. Use the internal antenna exactly per the u-blox reference design (ANT→ANT_INT, corner placement, counterpoise on ANT_PCB). External 32.768 kHz crystal (D-16). Do not propose ESP32 or bare-chip RF for rev A.
 - **Full factory assembly on JLCPCB**: every on-board part must be on LCSC or obtainable via Global Sourcing; all parts on the top side; no wires or battery soldered to the board. External links via JST SH 1.0 mm: 2-pin battery, 4-pin flight controller (5V, GND, TX, RX).
 - Board ~22 × 13 mm, 2 layers, 0.6 mm; module with antenna at the far end from the FC connector.
 - Power: Li-Po 1S with built-in PCM, TP4054 (C32574) from the FC's 5 V, TPS7A0233 3.3 V LDO (D-14). Module never above 3.6 V. White LED and PAM8904E run from VBAT.
-- Buzzer: Same Sky (CUI) CPT-12123-81-SMT-TR (C3812179) driven by PAM8904E, single footprint (D-13). Buzzer is event-driven, it dominates the energy budget.
+- Buzzer: Same Sky CPT-1117-83-SMT-TR (11 × 9 × 1.7 mm, 83 dB) driven by PAM8904E, via Global Sourcing from Arrow/Verical (D-20); fallback CPT-12123-81 (LCSC C3812179, different footprint). Board width may shrink from 13 to 11 mm at layout. Buzzer is event-driven, it dominates the energy budget.
 - Crash detection: MSP armed status over UART, LIS2DH12 impact, escalating alarm as fallback. Battery swaps and storage must not trigger a loud alarm. A button is required.
 - Radio: Apple Find My + Google Find Hub (via Everytag) + own Cricket sets on Coded PHY S8 (+8 dBm) and 1M. The owner's phone is a Pixel 7 Pro: scan with PHY_LE_ALL_SUPPORTED, not Coded only (Pixel bug). Radio is silent while the drone is armed (ELRS coexistence). Android app first.
 

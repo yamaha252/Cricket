@@ -32,6 +32,10 @@
 - уменьшить раздел настроек NVS;
 - перейти на MCUboot с одним слотом и обновлением по последовательному каналу (теряется OTA по BLE).
 
+## Порт Everytag на SDK 3.4.2
+
+Проверено 2026-11-09: Everytag собирается на SDK 3.4.2 после правки трёх строк — `bt_hci_cmd_create(...)` → `bt_hci_cmd_alloc(K_FOREVER)` в `src/main.c`, `BT_LE_ADV_OPT_CONNECTABLE` → `BT_LE_ADV_OPT_CONN` и `&auth_uuid` → `&auth_uuid.uuid` в `src/settings.c`; из конфигурации убран `CONFIG_RAM_POWER_ADJUST_ON_HEAP_RESIZE`. Под `nrf54l15dk/nrf54l10/cpuapp` с MCUboot: приложение 186 КБ из 444 КБ, MCUboot 40 КБ из 62 КБ, ОЗУ 56 КБ из 192 КБ. Работа на железе не проверена.
+
 ## Версия SDK
 
 Everytag собирается только на nRF Connect SDK **v2.8.0**: в v3.4.2 изменился Bluetooth-API (`bt_hci_cmd_create`, `BT_LE_ADV_OPT_CONNECTABLE`, `bt_uuid_cmp`) и формат описания плат. Обе версии установлены. Ревизия A прошивки ведётся на v2.8.0, перенос на 3.x — отдельная задача.

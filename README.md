@@ -22,6 +22,8 @@
 | [docs/concept.md](docs/concept.md) | архитектура, режимы, радио, энергобюджет |
 | [docs/components.md](docs/components.md) | компоненты, коды LCSC, номиналы, требования к антенне, масса |
 | [docs/manufacturing.md](docs/manufacturing.md) | заводская сборка на JLCPCB |
+| [docs/cost.md](docs/cost.md) | себестоимость по тиражам |
+| [docs/module-options.md](docs/module-options.md) | радиомодули со склада JLCPCB и голый nRF54L10 |
 | [docs/app.md](docs/app.md) | сети Find My и Find Hub, своё приложение |
 | [docs/setup.md](docs/setup.md) | окружение разработки |
 
@@ -37,4 +39,10 @@
 
 ## Статус
 
-Требования и компоненты ревизии A согласованы 2026-11-09. Следующий шаг: схема cricket-tag. Лицензия не выбрана.
+Требования и компоненты ревизии A согласованы 2026-11-09:
+
+- радиомодуль u-blox ANNA-B402 (nRF52833), излучатель Same Sky CPT-1117-83, оба через JLCPCB Global Sourcing, сборка Standard PCBA;
+- себестоимость ~17 $ за плату при 24 шт., ~12 $ при 120 шт.;
+- первый заказ — тестовая партия 8 плат примерно за 230 $.
+
+Следующий шаг: схема cricket-tag. Лицензия не выбрана.
