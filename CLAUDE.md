@@ -1,0 +1,65 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+Cricket is a hardware + firmware project: an ultra-light BLE crash beacon for drones (`cricket-tag`) and a receiver for a search drone (`cricket-seeker`). It was spun out of an analysis of the Epi_C3 ESP32-C3 board (sibling repo `../Epi_C3`); nothing from that board is reused except, possibly, as a Wi-Fi bridge on the seeker.
+
+Read the docs before proposing parts, topology or behaviour changes. They record decisions agreed with the owner:
+
+- `docs/requirements.md` — what the owner asked for (target drones, mass, loudness, factory assembly, phones).
+- `docs/decisions.md` — numbered decision log (D-1…) with reasons. Add new entries on top; never silently reverse one.
+- `docs/concept.md` — architecture, schematic notes, operating modes, radio, energy budget.
+- `docs/components.md` — BOM source of truth until the schematic exists: LCSC codes, passive values, antenna keep-out geometry, mass.
+- `docs/manufacturing.md` — JLCPCB full-assembly rules.
+- `docs/app.md` — Find My / Find Hub and the Android app.
+
+Priorities, in order: weight and size, power, range. Expected line-of-sight range on the small board: 150–250 m on 1M, 300–500 m on Coded PHY (D-17).
+
+## Fixed decisions
+
+- MCU/radio: **u-blox ANNA-B402-00B** (Nordic nRF52833, 6.5 × 6.5 mm SiP, internal chip antenna, +8 dBm), bought by JLCPCB via Global Sourcing from Mouser (D-15). The owner rejected consigning parts, so every part must come from JLCPCB stock or Global Sourcing. Use the internal antenna exactly per the u-blox reference design (ANT→ANT_INT, corner placement, counterpoise on ANT_PCB). External 32.768 kHz crystal (D-16). Do not propose ESP32 or bare-chip RF for rev A.
+- **Full factory assembly on JLCPCB**: every on-board part must be on LCSC or obtainable via Global Sourcing; all parts on the top side; no wires or battery soldered to the board. External links via JST SH 1.0 mm: 2-pin battery, 4-pin flight controller (5V, GND, TX, RX).
+- Board ~22 × 13 mm, 2 layers, 0.6 mm; module with antenna at the far end from the FC connector.
+- Power: Li-Po 1S with built-in PCM, TP4054 (C32574) from the FC's 5 V, TPS7A0233 3.3 V LDO (D-14). Module never above 3.6 V. White LED and PAM8904E run from VBAT.
+- Buzzer: Same Sky (CUI) CPT-12123-81-SMT-TR (C3812179) driven by PAM8904E, single footprint (D-13). Buzzer is event-driven, it dominates the energy budget.
+- Crash detection: MSP armed status over UART, LIS2DH12 impact, escalating alarm as fallback. Battery swaps and storage must not trigger a loud alarm. A button is required.
+- Radio: Apple Find My + Google Find Hub (via Everytag) + own Cricket sets on Coded PHY S8 (+8 dBm) and 1M. The owner's phone is a Pixel 7 Pro: scan with PHY_LE_ALL_SUPPORTED, not Coded only (Pixel bug). Radio is silent while the drone is armed (ELRS coexistence). Android app first.
+
+## Layout
+
+- `hardware/cricket-tag/` — KiCad project for the beacon (skeleton; schematic next).
+- `hardware/cricket-seeker/` — receiver for a search drone (not started).
+- `firmware/` — Zephyr / nRF Connect SDK (not started).
+- `app/` — Android app (not started).
+- `docs/` — see above.
+
+## Working with KiCad files
+
+KiCad 10 is installed (`kicad-cli` on PATH via Homebrew). The project files were created in KiCad 8 format; KiCad 10 opens them and rewrites them in its own format on first save, which is expected. Run checks headless after any edit:
+
+```bash
+kicad-cli sch erc hardware/cricket-tag/cricket-tag.kicad_sch -o /tmp/erc.rpt
+kicad-cli pcb drc hardware/cricket-tag/cricket-tag.kicad_pcb -o /tmp/drc.rpt
+```
+
+Both must report 0 violations before fabrication outputs are generated. On the empty skeleton DRC reports one `invalid_outline` until the board edge is drawn. Fabrication outputs (gerbers, drill, CPL, BOM with LCSC part numbers) are generated with `kicad-cli pcb export ...` / `kicad-cli sch export bom` into `hardware/<board>/fab/`, never edited by hand. Full command list in `docs/setup.md`.
+
+## Firmware toolchain
+
+nRF Connect SDK v3.4.2 and v2.8.0 are installed through `nrfutil sdk-manager` (under `/opt/nordic/ncs`). Firmware rev A targets **v2.8.0**, because Everytag does not build on 3.x (Bluetooth API changes); see `firmware/README.md`. Build inside the toolchain shell so the system Python is never used:
+
+```bash
+nrfutil sdk-manager toolchain launch --ncs-version v2.8.0 -- west build -b <board> --sysbuild firmware/app -d firmware/build
+```
+
+Flash with `west flash` (J-Link, installed) or `probe-rs run --chip nRF52833_xxAA ...`. Until a board definition for ANNA-B402 exists, build for `nrf52833dk/nrf52833`.
+
+## Conventions
+
+- Values in metric SI with unit symbols (`4,7µF`, `10kΩ`), consistent with the Epi_C3 style.
+- Any new footprint or 3D model goes into `hardware/<board>/lib/` and is referenced via `${KIPRJMOD}`.
+- Keep `docs/components.md` and `docs/decisions.md` in sync when a part or behaviour changes.
+- Fill the `LCSC Part` field on every schematic symbol so the JLCPCB BOM is generated, not hand-written.
+- Docs are written in Russian; keep that.

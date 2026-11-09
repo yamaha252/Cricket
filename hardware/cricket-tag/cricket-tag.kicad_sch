@@ -1,0 +1,18 @@
+(kicad_sch
+	(version 20231120)
+	(generator "eeschema")
+	(generator_version "8.0")
+	(uuid "56dee62f-8129-4e4a-ba8f-7a3ded8abe6b")
+	(paper "A4")
+	(title_block
+		(title "Cricket Tag")
+		(rev "A")
+		(comment 1 "Ultra-light BLE crash beacon, nRF54L15 (Ezurio BL54L15u)")
+	)
+	(lib_symbols)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+)

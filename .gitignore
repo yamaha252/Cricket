@@ -1,0 +1,16 @@
+# KiCad
+*-backups/
+*.kicad_prl
+*.lck
+fp-info-cache
+_autosave-*
+*.kicad_pcb-bak
+*.kicad_sch-bak
+\#auto_saved_files\#
+
+# Zephyr / west
+firmware/build/
+firmware/.west/
+
+# OS
+.DS_Store
