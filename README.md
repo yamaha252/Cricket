@@ -31,7 +31,7 @@
 
 | Папка | Назначение | Статус |
 |---|---|---|
-| `hardware/cricket-tag/` | KiCad-проект маячка | скелет, схема не начата |
+| `hardware/cricket-tag/` | KiCad-проект маячка | библиотека с ANNA-B402 готова, схема не начата |
 | `hardware/cricket-seeker/` | приёмник для поискового дрона | не начат |
 | `firmware/` | прошивка, Zephyr / nRF Connect SDK | не начата |
 | `app/` | Android-приложение | не начато |

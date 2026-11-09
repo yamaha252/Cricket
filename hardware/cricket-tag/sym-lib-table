@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "cricket")(type "KiCad")(uri "${KIPRJMOD}/lib/cricket.kicad_sym")(options "")(descr "Символы проекта Cricket"))
+)
