@@ -13,6 +13,20 @@
 - Громкий бипер уровня Flywoo Finder V1.0 и белый светодиод.
 - Собирается на заводе JLCPCB целиком, руками только прошивка и пайка проводов аккумулятора и полётника к площадкам (D-26).
 
+## Схема и плата
+
+Ревизия A: 17 × 32 мм, 2 слоя, 0,6 мм, все детали сверху. Подробности — в [hardware/cricket-tag/README.md](hardware/cricket-tag/README.md).
+
+[![Схема cricket-tag, ревизия A](hardware/cricket-tag/render/schematic.png)](hardware/cricket-tag/render/schematic.png)
+
+<p>
+  <img src="hardware/cricket-tag/render/3d-top.png" alt="Плата сверху" width="260">
+  <img src="hardware/cricket-tag/render/3d-bottom.png" alt="Плата снизу" width="260">
+  <img src="hardware/cricket-tag/render/copper-top-bottom.png" alt="Медь: верхний и нижний слой" width="440">
+</p>
+
+Слева направо: верх, низ с площадками проводов и SWD, медь обоих слоёв. Модуль ANNA-B402 (вверху слева, у антенны) и излучатель (большой прямоугольник внизу) на рендере не показаны: у них нет 3D-моделей, видны только площадки.
+
 ## Документация
 
 | Документ | Содержание |
