@@ -26,6 +26,7 @@ kicad-cli sch export bom "$SCH" -o "$OUT/bom-kicad.csv" \
 kicad-cli pcb export pos "$PCB" -o "$OUT/pos-kicad.csv" --format csv --units mm \
   --side front --exclude-dnp 2>&1 | q
 
+# bom.csv, cpl.csv — для JLCPCB; bom-mpn.csv, cpl-kicad.csv — для других заводов.
 # BOM: JLCPCB читает CSV не как UTF-8 («µ» → «碌», «Ω» → «惟»), поэтому в Comment
 # только ASCII. Подбор идёт по LCSC Part #, Comment — для человека.
 # CPL: KiCad Ref,Val,Package,PosX,PosY,Rot,Side -> JLCPCB Designator,Mid X,Mid Y,Layer,Rotation.
@@ -43,7 +44,31 @@ ROT_FIX = {
     "C8545": 180,     # Q1 2N7002, SOT-23
     "C110926": 270,   # U5 LIS2DH12, LGA-12
 }
-lcsc = {}
+# Производитель и номер производителя по номеру LCSC — для заводов без каталога LCSC
+# (NextPCB и др.). Номера пассивов — из подбора BOM на JLCPCB 2026-11-10.
+MPN = {
+    "C22359733": ("Same Sky", "CPT-1117-83-SMT-TR"),
+    "C19702": ("Samsung Electro-Mechanics", "CL10A106KP8NNNC"),
+    "C52923": ("Samsung Electro-Mechanics", "CL05A105KA5NQNC"),
+    "C1525": ("Samsung Electro-Mechanics", "CL05B104KO5NNNC"),
+    "C23630": ("Samsung Electro-Mechanics", "CL10A225KO8NNNC"),
+    "C8598": ("Changjiang Electronics Tech (CJ)", "B5819W SL"),
+    "C2290": ("Hubei KENTO Elec", "KT-0603W"),
+    "C8545": ("Changjiang Electronics Tech (CJ)", "2N7002"),
+    "C26083": ("UNI-ROYAL", "0402WGF1004TCE"),
+    "C22276": ("UNI-ROYAL", "0402WGF1504TCE"),
+    "C25768": ("UNI-ROYAL", "0402WGF2202TCE"),
+    "C11702": ("UNI-ROYAL", "0402WGF1001TCE"),
+    "C25091": ("UNI-ROYAL", "0402WGF2200TCE"),
+    "C25744": ("UNI-ROYAL", "0402WGF1002TCE"),
+    "C720477": ("XUNPU", "TS-1088-AR02016"),
+    "C44975104": ("Insight SiP", "ISP2454-LX-RS"),
+    "C32574": ("TOPPOWER", "TP4054-42-SOT25R"),
+    "C2887324": ("Texas Instruments", "TPS7A0233PDBVR"),
+    "C510550": ("Diodes Incorporated", "PAM8904EGPR"),
+    "C110926": ("STMicroelectronics", "LIS2DH12TR"),
+}
+lcsc, rows = {}, []
 with open(bom_src, newline="", encoding="utf-8") as f, \
         open(bom_dst, "w", newline="", encoding="ascii") as g:
     w = csv.writer(g, quoting=csv.QUOTE_ALL)
@@ -52,15 +77,34 @@ with open(bom_src, newline="", encoding="utf-8") as f, \
             r[0] = r[0].replace("µ", "u").replace("Ω", "Ohm")
             for ref in r[1].split(","):
                 lcsc[ref] = r[3]
+            rows.append(r)
         w.writerow(r)
-with open(pos_src, newline="", encoding="utf-8") as f, \
-        open(cpl_dst, "w", newline="", encoding="ascii") as g:
+# BOM с номерами производителя: Designator, Quantity, Manufacturer, MPN, Description, Package, LCSC.
+with open(bom_dst.replace("bom.csv", "bom-mpn.csv"), "w", newline="", encoding="ascii") as g:
+    w = csv.writer(g, quoting=csv.QUOTE_ALL)
+    w.writerow(["Designator", "Quantity", "Manufacturer", "Manufacturer Part Number",
+                "Description", "Package", "LCSC Part #"])
+    for comment, refs, fp, part in rows:
+        man, mpn = MPN[part]
+        w.writerow([refs, len(refs.split(",")), man, mpn, comment, fp.split(":")[-1], part])
+with open(pos_src, newline="", encoding="utf-8") as f:
+    pos = list(csv.DictReader(f))
+with open(cpl_dst, "w", newline="", encoding="ascii") as g:
     w = csv.writer(g)
     w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
-    for r in csv.DictReader(f):
+    for r in pos:
         rot = (float(r["Rot"]) + ROT_FIX.get(lcsc.get(r["Ref"], ""), 0)) % 360
         w.writerow([r["Ref"], f'{float(r["PosX"]):.4f}mm', f'{float(r["PosY"]):.4f}mm',
                     "Top" if r["Side"] == "top" else "Bottom", f"{rot:g}"])
+# CPL без поправок JLCPCB — повороты KiCad как есть, для других заводов.
+with open(cpl_dst.replace("cpl.csv", "cpl-kicad.csv"), "w", newline="", encoding="ascii") as g:
+    w = csv.writer(g)
+    w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
+    for r in pos:
+        w.writerow([r["Ref"], f'{float(r["PosX"]):.4f}mm', f'{float(r["PosY"]):.4f}mm',
+                    "Top" if r["Side"] == "top" else "Bottom", f'{float(r["Rot"]) % 360:g}'])
 EOF
 rm "$OUT/pos-kicad.csv" "$OUT/bom-kicad.csv"
+# NextPCB принимает файл расстановки только как zip/rar/xls/xlsx.
+(cd "$OUT" && zip -q cpl-kicad.zip cpl-kicad.csv)
 ls -l "$OUT"

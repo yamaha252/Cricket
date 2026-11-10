@@ -19,7 +19,7 @@ $KICAD_CLI sch erc  hardware/cricket-tag/cricket-tag.kicad_sch -o /tmp/erc.rpt
 $KICAD_CLI pcb drc  --schematic-parity hardware/cricket-tag/cricket-tag.kicad_pcb -o /tmp/drc.rpt
 ```
 
-Выходные файлы для JLCPCB (gerber-zip, `bom.csv`, `cpl.csv` в `hardware/cricket-tag/fab/`) делает один скрипт. Внутри — те же `kicad-cli pcb export gerbers/drill/pos` и `sch export bom`, плюс перевод в формат JLCPCB, поправки поворота по номеру LCSC и ASCII в BOM ([manufacturing.md](manufacturing.md#выходные-файлы)):
+Выходные файлы для заводов (gerber-zip; `bom.csv`, `cpl.csv` для JLCPCB; `bom-mpn.csv`, `cpl-kicad.csv`/`.zip` для NextPCB и других, в `hardware/cricket-tag/fab/`) делает один скрипт. Внутри — те же `kicad-cli pcb export gerbers/drill/pos` и `sch export bom`, плюс перевод форматов, поправки поворота JLCPCB по номеру LCSC, номера производителей и ASCII в BOM ([manufacturing.md](manufacturing.md#выходные-файлы)). Gerber при каждом запуске меняются только датой в заголовке:
 
 ```bash
 hardware/cricket-tag/make_fab.sh
