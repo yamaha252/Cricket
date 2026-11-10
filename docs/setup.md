@@ -63,12 +63,12 @@ west build -b nrf54l15dk/nrf54l15/cpuapp nrf/samples/bluetooth/peripheral_lbs -d
 nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54l15dk/nrf54l15/cpuapp <app> -d <build-dir>
 ```
 
-Целевая плата для `firmware/` — свой board definition под ANNA-B402 (nRF52833), пока его нет, собирать под `nrf52833dk/nrf52833`. Toolchain тот же. Проверено 2026-11-09: `peripheral_lbs` под `nrf52833dk/nrf52833` собирается, FLASH 177 КБ из 512 (35 %), RAM 28 КБ из 128 (22 %).
+Целевая плата для `firmware/` — свой board definition под ISP2454-LX (nRF54L15, D-29), пока его нет, собирать под `nrf54l15dk/nrf54l15/cpuapp`; отладочная плата — nRF54L15 DK. До D-29 целью был `nrf52833dk/nrf52833`: Toolchain тот же. Проверено 2026-11-09: `peripheral_lbs` под `nrf52833dk/nrf52833` собирается, FLASH 177 КБ из 512 (35 %), RAM 28 КБ из 128 (22 %).
 
 ## Прошивка на устройство
 
-- J-Link (включая встроенный в nRF52833-DK): `west flash` или `nrfutil device program --firmware build/zephyr/zephyr.hex`.
-- Любой CMSIS-DAP / J-Link через probe-rs: `probe-rs run --chip nRF52833_xxAA build/zephyr/zephyr.elf`.
+- J-Link (включая встроенный в nRF54L15 DK): `west flash` или `nrfutil device program --firmware build/zephyr/zephyr.hex`.
+- Любой CMSIS-DAP / J-Link через probe-rs: `probe-rs run --chip nRF54L15_xxAA build/zephyr/zephyr.elf`.
 - У cricket-tag площадки SWD J3 снизу под аккумулятором: 1 VDD, 2 SWDIO, 3 SWCLK, 4 GND, шаг 2,54 мм, без отверстий. Прошивать до пайки аккумулятора, подпружиненными контактами или временными проводами (D-26).
 
 ## Что установлено (проверено 2026-11-09)

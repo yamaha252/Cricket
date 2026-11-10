@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Плата cricket-tag из схемы: детали по расстановке floorplan (вариант w17d),
+"""Плата cricket-tag из схемы: детали по расстановке floorplan (вариант isp_c, D-29),
 цепи из списка соединений, контур, закреплённый вывод цепей из-под модуля
-(module_escape). Остальная разводка — Freerouting, затем import_ses.py, который
+(module_escape) и обвязка драйвера пищалки (driver_ground, driver_routes). Остальная разводка — Freerouting, затем import_ses.py, который
 добавляет заливки GND (add_zones): во время трассировки GND разводится как
 обычная цепь, иначе Freerouting оставляет землю рваной.
 
@@ -27,7 +27,7 @@ from symlib import parse, unq  # noqa: E402
 import floorplan  # noqa: E402
 
 STD = "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints"
-VARIANT = floorplan.variant_w17d
+VARIANT = floorplan.variant_isp_c
 OX, OY = 100.0, 100.0          # левый верхний угол платы на листе, мм
 PCB = os.path.join(HERE, "cricket-tag.kicad_pcb")
 
@@ -168,23 +168,46 @@ def gnd_zone(board, net, layer, W, L, priority=0):
     return z
 
 
-# Вывод из-под ANNA-B402, координаты от центра модуля (D-24, D-28). Внутренние
-# ряды на двух слоях иначе не вывести: зазоры между площадками 0,3 мм.
-#  - GND 43–46 (верхний внутренний ряд) соединены между собой и с GND 4 на левом столбце;
-#  - центральные GND 53–56 — на переходное 0,5/0,3 мм в середине между ними;
-#  - SWDIO 42 и SWDCLK 41 — на переходные в свободном месте под модулем справа сверху,
-#    вне зоны антенны, дальше по нижнему слою к J3.
+# Вывод из-под ISP2454-LX, координаты от центра модуля (D-29): антенная половина вверху (−Y),
+# верхний ряд выводов внизу (+Y). Между площадками 0,25 мм — дорожка не проходит, поэтому:
+#  - GND 8 к угловой GND 7; GND 21–23–24 к угловой GND 25; центральные GND 12–18 не подключены;
+#  - угловые GND — на свои переходные: 25 — в полосе у левой кромки над VDD, 7 — в пустой
+#    середине под модулем, 31 — сразу за корпусом. Иначе Freerouting ставит их у зоны антенны.
+#    Для GND 1 место выбирает Freerouting: своё переходное перекрывало путь к акселерометру;
+#  - OUT_MOD 22 ↔ OUT_ANT 20 перемычкой вдоль ряда;
+#  - UART_RX с внутренней площадки 29 (P0.00) на переходное в середине под модулем,
+#    закрытое маской, дальше по нижнему слою;
+#  - VDD 26, SWDIO 28, SWDCLK 30 — по полосе 1,3 мм между модулем и левой кромкой вниз,
+#    за курятник модуля, на переходные лесенкой; дальше разводит Freerouting. К концу дорожки
+#    без переходного Freerouting не подключается.
+# Цепь задаётся площадкой модуля ("pad:N"): имена неименованных цепей зависят от KiCad.
 ESCAPE_TRACKS = [  # (цепь, ширина, (x, y)...)
-    ("GND", 0.2, (0, -1.435), (-0.65, -1.435), (-1.3, -1.435), (-1.95, -1.435)),
-    ("GND", 0.15, (-1.95, -1.435), (-2.84, -0.598)),
-    ("GND", 0.2, (0, 0.702), (-0.52, 0.252)),
-    ("GND", 0.2, (0, 0.702), (0.52, 0.252)),
-    ("GND", 0.2, (0, 0.702), (-0.52, 1.152)),
-    ("GND", 0.2, (0, 0.702), (0.52, 1.152)),
-    ("/SWDIO", 0.15, (0.65, -1.435), (0.8, -2.55)),
-    ("/SWDCLK", 0.15, (1.3, -1.435), (1.65, -2.2)),
+    ("pad:7", 0.2, (2.6, 0.2), (3.3, 0.2)),
+    ("pad:7", 0.2, (3.1, 0.8), (2.4, 1.55)),
+    ("pad:25", 0.2, (-2.6, 0.2), (-3.3, 0.2)),
+    ("pad:25", 0.2, (-2.275, 0.85), (-2.6, 0.2)),
+    ("pad:25", 0.2, (-1.625, 0.85), (-2.275, 0.85)),
+    ("pad:25", 0.25, (-3.5, 0.6), (-4.65, 0.6)),
+    ("pad:31", 0.25, (-3.5, 3.5), (-3.5, 4.75)),
+    ("pad:20", 0.2, (-1.95, 0.2), (-1.3, 0.2)),
+    ("pad:29", 0.15, (-3.05, 2.275), (-2.1, 1.95)),
+    # VDD, SWDIO, SWDCLK вдоль левой кромки (x платы 0,35 / 0,68 / 1,01) и на переходные под модулем
+    ("pad:26", 0.15, (-3.7, 1.3), (-4.95, 1.3), (-4.95, 7.2), (-4.7, 7.6)),
+    ("pad:28", 0.15, (-3.7, 1.95), (-4.62, 1.95), (-4.62, 6.2), (-4.45, 6.6)),
+    ("pad:30", 0.15, (-3.7, 2.6), (-4.29, 2.6), (-4.29, 5.0), (-4.05, 5.5)),
+    # ACC_INT1: с верхнего ряда (48) к INT1 акселерометра наверху его корпуса. Напрямую путь
+    # перекрыт I2C и каналом под модулем: переходное справа от модуля, вверх по нижнему слою
+    # под самим модулем (полоса справа на нижнем слое остаётся свободной), второе переходное
+    # у U5, сверху к INT1 вдоль границы зоны антенны
+    ("pad:48", 0.15, (2.6, 3.7), (2.6, 4.4), (4.35, 4.4), (4.35, 4.5)),
+    ("pad:48", 0.15, "B", (4.35, 4.5), (3.3, 3.45), (3.3, 1.2), (4.35, 0.35)),
+    ("pad:48", 0.15, (4.35, 0.35), (4.35, 0.2), (5.65, 0.2), (5.65, 0.64)),
 ]
-ESCAPE_VIAS = [("GND", 0.5, 0.3, (0, 0.702)), ("/SWDIO", 0.5, 0.3, (0.8, -2.55)), ("/SWDCLK", 0.5, 0.3, (1.65, -2.2))]
+ESCAPE_VIAS = [("pad:29", 0.5, 0.3, (-2.1, 1.95)), ("pad:7", 0.5, 0.3, (2.4, 1.55)),
+               ("pad:25", 0.5, 0.3, (-4.65, 0.6)), ("pad:31", 0.5, 0.3, (-3.5, 4.75)),
+               ("pad:26", 0.5, 0.3, (-4.7, 7.6)), ("pad:28", 0.5, 0.3, (-4.45, 6.6)),
+               ("pad:30", 0.5, 0.3, (-4.05, 5.5)),
+               ("pad:48", 0.5, 0.3, (4.35, 4.5)), ("pad:48", 0.5, 0.3, (4.35, 0.35))]
 
 
 def driver_ground(board, netinfo):
@@ -210,21 +233,108 @@ def driver_ground(board, netinfo):
     board.Add(v)
 
 
+# Обвязка PAM8904E (D-29), точки от центра U4. Порядок выводов по кругу — 12 VBAT, 11 CP2,
+# 10 VOUT, 9 CP1, 8 CN2, 7 OUTP — не даёт развести накачку в один слой, а снизу под драйвером
+# лежат площадки батареи J2, так что переходные стоят только вокруг них. Freerouting сам
+# эти связи не находит. CP2 уходит вниз переходным между C10 и C13 и выходит к C12;
+# CP1 — переходным над J2 и по низу справа от J2 к C11; VOUT по диагонали к C13 и C14;
+# VBAT вывода 12 — переходным прямо на J2.1; OUTP — к переходному справа от C12,
+# дальше к излучателю разводит Freerouting или maze.py.
+DRIVER_TRACKS = [   # (вывод U4, ширина, слой, точки…)
+    ("12", 0.25, "F", (-0.4, -0.9), (-0.4, -1.407), (-1.032, -1.407), (-1.775, -2.15)),
+    ("12", 0.25, "F", (-0.9, -1.1), (-0.9, -1.407)),
+    ("12", 0.25, "B", (-0.9, -1.1), (0.75, -1.1), (0.75, -0.4)),
+    # 0,12 мм: щель между углом C10.2 и выводом 10 — 0,41 мм
+    ("11", 0.12, "F", (0.0, -0.9), (0.0, -1.162), (0.63, -1.792), (0.63, -2.15)),
+    ("11", 0.15, "B", (0.63, -2.15), (1.38, -2.15), (2.13, -1.4), (2.3, -1.4)),
+    ("11", 0.15, "F", (2.3, -1.4), (2.3, -0.68)),
+    ("10", 0.15, "F", (0.4, -0.9), (0.4, -1.15), (0.77, -1.52), (1.37, -1.52), (1.37, -3.1)),
+    ("9", 0.15, "F", (0.9, -0.4), (1.3, -0.4), (1.6, -0.7), (1.6, -1.1)),
+    ("9", 0.15, "B", (1.6, -1.1), (2.0, -0.7), (2.0, 1.53), (1.005, 2.525)),
+    ("9", 0.15, "F", (1.005, 2.525), (0.48, 2.0)),
+    ("7", 0.15, "F", (0.9, 0.4), (1.35, 0.4), (1.95, 1.0), (2.5, 1.0)),
+]
+DRIVER_VIAS = [("12", (-0.9, -1.1)), ("11", (0.63, -2.15)), ("11", (2.3, -1.4)),
+               ("9", (1.6, -1.1)), ("9", (1.005, 2.525)), ("7", (2.5, 1.0))]
+
+
+def driver_routes(board, skip_existing=False):
+    """Закреплённая обвязка драйвера по DRIVER_TRACKS и DRIVER_VIAS. skip_existing — не дублировать
+    отрезки и переходные, которые уже есть на плате (доводка готовой платы, finish_driver.py)."""
+    u4 = board.FindFootprintByReference("U4")
+    c = u4.GetPosition()
+    pads = {p.GetNumber(): p for p in u4.Pads()}
+
+    def at(p):
+        return pcbnew.VECTOR2I(c.x + pcbnew.FromMM(p[0]), c.y + pcbnew.FromMM(p[1]))
+
+    have = set()
+    if skip_existing:
+        for t in board.GetTracks():
+            if t.Type() == pcbnew.PCB_VIA_T:
+                have.add(("V", t.GetNetCode(), t.GetPosition().x, t.GetPosition().y))
+            else:
+                a, b = sorted([(t.GetStart().x, t.GetStart().y), (t.GetEnd().x, t.GetEnd().y)])
+                have.add((t.GetLayer(), t.GetNetCode(), a, b))
+    n = 0
+    for pin, w, lay, *pts in DRIVER_TRACKS:
+        net = pads[pin].GetNet()
+        layer = pcbnew.B_Cu if lay == "B" else pcbnew.F_Cu
+        for a, b in zip(pts, pts[1:]):
+            A, B = at(a), at(b)
+            key = (layer, net.GetNetCode(), *sorted([(A.x, A.y), (B.x, B.y)]))
+            if key in have:
+                continue
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(A)
+            t.SetEnd(B)
+            t.SetWidth(pcbnew.FromMM(w))
+            t.SetLayer(layer)
+            t.SetNet(net)
+            t.SetLocked(True)
+            board.Add(t)
+            n += 1
+    for pin, p in DRIVER_VIAS:
+        net = pads[pin].GetNet()
+        P = at(p)
+        if ("V", net.GetNetCode(), P.x, P.y) in have:
+            continue
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(P)
+        v.SetWidth(pcbnew.FromMM(0.5))
+        v.SetDrill(pcbnew.FromMM(0.3))
+        v.SetNet(net)
+        v.SetLocked(True)
+        board.Add(v)
+        n += 1
+    return n
+
+
 def module_escape(board, netinfo):
     u1 = board.FindFootprintByReference("U1")
     c = u1.GetPosition()
+    pads = {p.GetNumber(): p for p in u1.Pads()}
+
+    def net_of(name):
+        if name.startswith("pad:"):
+            return pads[name[4:]].GetNet()
+        return netinfo[name]
 
     def at(p):
         return pcbnew.VECTOR2I(c.x + pcbnew.FromMM(p[0]), c.y + pcbnew.FromMM(p[1]))
 
     for net, w, *pts in ESCAPE_TRACKS:
+        layer = pcbnew.F_Cu
+        if isinstance(pts[0], str):
+            layer = pcbnew.B_Cu if pts[0] == "B" else pcbnew.F_Cu
+            pts = pts[1:]
         for a, b in zip(pts, pts[1:]):
             t = pcbnew.PCB_TRACK(board)
             t.SetStart(at(a))
             t.SetEnd(at(b))
             t.SetWidth(pcbnew.FromMM(w))
-            t.SetLayer(pcbnew.F_Cu)
-            t.SetNet(netinfo[net])
+            t.SetLayer(layer)
+            t.SetNet(net_of(net))
             t.SetLocked(True)
             board.Add(t)
     for net, d, drill, p in ESCAPE_VIAS:
@@ -232,7 +342,7 @@ def module_escape(board, netinfo):
         v.SetPosition(at(p))
         v.SetWidth(pcbnew.FromMM(d))
         v.SetDrill(pcbnew.FromMM(drill))
-        v.SetNet(netinfo[net])
+        v.SetNet(net_of(net))
         v.SetLocked(True)
         board.Add(v)
 
@@ -318,6 +428,7 @@ def main(netlist):
 
     module_escape(board, netinfo)
     driver_ground(board, netinfo)
+    driver_routes(board)
 
     # Подписи площадок под провода на нижней стороне
     j1 = board.FindFootprintByReference("J1")

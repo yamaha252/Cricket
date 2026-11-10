@@ -5,9 +5,11 @@ A* на сетке STEP мм по двум слоям, 8 направлений,
 переходное 0,5/0,3 мм там, где оно проходит по зазорам на обоих слоях.
 Препятствия — чужая медь (дорожки, переходные, площадки по описанному
 прямоугольнику), край платы и зона антенны модуля; заливки не учитываются,
-их перезаливает stitch.py. Старт — площадка A, цель — площадка B.
+их перезаливает stitch.py. Старт — площадка A, цель — площадка B. Ступеньки сетки
+спрямляются по прямой видимости. Grid(soft=…) разрешает пересекать дорожки указанных
+цепей за штраф (finish_driver.py так ведёт OUTP поперёк дорожек GND).
 
-    $KICAD_PY maze.py J1:4~R7:2 U1:32~U5:1 NET:/I2C_SCL
+    $KICAD_PY maze.py J1:4~R7:2 U1:4~U5:1 NET:/I2C_SCL
 """
 
 import heapq
@@ -27,14 +29,17 @@ CLEAR = 0.14
 EDGE = 0.25
 VIA_D, VIA_DRILL, HOLE_CLEAR = 0.5, 0.3, 0.25
 VIA_COST = 40
+SOFT_COST = 6       # за клетку по мягкой чужой меди
 POWER = ("GND", "VBAT", "+5V", "VCHG", "+3V3")
 F, B = 0, 1
-# Зона антенны и место под модулем от центра U1 (gen_anna_b402.py): дорожкам и переходным нельзя
-KEEPOUT_U1 = [(-4.25, -7.5, 0.35, -1.75), (0.35, -7.5, 3.25, -3.25)]
+# Зона антенны и середина под модулем от центра U1 (gen_isp2454.py, D-29): дорожкам и переходным нельзя
+KEEPOUT_U1 = [(-5.5, -5.5, 9.5, 0.0), (-2.8, 1.15, 2.8, 2.75)]
 
 
 class Grid:
-    def __init__(self, board, net, w):
+    def __init__(self, board, net, w, soft=()):
+        """soft — имена цепей, чьи дорожки и переходные можно пересечь за штраф SOFT_COST на клетку
+        (GND: перерезанное потом снимается, землю держат заливки)."""
         W, L = gen_pcb.VARIANT()[1:3]
         self.ox, self.oy = gen_pcb.OX, gen_pcb.OY
         self.nx, self.ny = int(W / STEP) + 1, int(L / STEP) + 1
@@ -42,6 +47,8 @@ class Grid:
         n = self.nx * self.ny
         self.block = [bytearray(n), bytearray(n)]   # центр дорожки сюда нельзя
         self.novia = bytearray(n)                   # переходное сюда нельзя
+        self.soft = [bytearray(n), bytearray(n)]    # здесь мягкая чужая медь: можно, но дорого
+        self.softvia = bytearray(n)
         h = w / 2
         rv = VIA_D / 2
         # край платы
@@ -56,7 +63,18 @@ class Grid:
         cx, cy = mm(u1.x) - self.ox, mm(u1.y) - self.oy
         for x0, y0, x1, y1 in KEEPOUT_U1:
             self.rect(cx + x0, cy + y0, cx + x1, cy + y1, h, (F, B), via_pad=rv)
-        for t in board.GetTracks():
+        hard = [t for t in board.GetTracks() if t.GetNetname() not in soft]
+        self.tracks(hard, net, h, rv)
+        if soft:
+            self.block, self.soft = self.soft, self.block
+            self.novia, self.softvia = self.softvia, self.novia
+            self.tracks([t for t in board.GetTracks() if t.GetNetname() in soft], net, h, rv)
+            self.block, self.soft = self.soft, self.block
+            self.novia, self.softvia = self.softvia, self.novia
+        self.pads(board, net, h, rv)
+
+    def tracks(self, items, net, h, rv):
+        for t in items:
             if t.Type() == pcbnew.PCB_VIA_T:
                 p = t.GetPosition()
                 x, y = mm(p.x) - self.ox, mm(p.y) - self.oy
@@ -71,6 +89,8 @@ class Grid:
                 lay = F if t.GetLayer() == pcbnew.F_Cu else B
                 self.seg(mm(s.x) - self.ox, mm(s.y) - self.oy, mm(e.x) - self.ox, mm(e.y) - self.oy,
                          mm(t.GetWidth()) / 2 + CLEAR, h, lay, rv)
+
+    def pads(self, board, net, h, rv):
         for fp in board.GetFootprints():
             for pad in fp.Pads():
                 if pad.GetNetCode() == net:
@@ -174,10 +194,10 @@ def astar(g, starts, goals):
         for di, dj, dc in dirs:
             ni, nj = i + di, j + dj
             if 0 <= ni < g.nx and 0 <= nj < g.ny and not g.block[lay][nj * g.nx + ni]:
-                nbrs.append(((ni, nj, lay), dc))
+                nbrs.append(((ni, nj, lay), dc + SOFT_COST * g.soft[lay][nj * g.nx + ni]))
         k = j * g.nx + i
         if not g.novia[k] and not g.block[1 - lay][k]:
-            nbrs.append(((i, j, 1 - lay), VIA_COST))
+            nbrs.append(((i, j, 1 - lay), VIA_COST + SOFT_COST * (g.softvia[k] + g.soft[1 - lay][k])))
         for nxt, dc in nbrs:
             nc = c + dc
             if nc < cost.get(nxt, 1e18):
@@ -205,12 +225,47 @@ def route(board, spec):
     path = astar(g, starts, goals)
     if not path:
         return f"{spec}: пути нет"
+    nvias = emit(board, g, path, w, netinfo)
+    return f"{spec}: проложено, переходных {nvias}"
+
+
+def clear_line(g, a, b):
+    """Отрезок между клетками a и b на одном слое не задевает препятствий сетки."""
+    n = max(1, int(math.hypot(b[0] - a[0], b[1] - a[1]) * 4))
+    blk, soft = g.block[a[2]], g.soft[a[2]]
+    for k in range(n + 1):
+        i = int(round(a[0] + (b[0] - a[0]) * k / n))
+        j = int(round(a[1] + (b[1] - a[1]) * k / n))
+        if blk[j * g.nx + i] or soft[j * g.nx + i]:
+            return False
+    return True
+
+
+def simplify(g, pts):
+    """Спрямление по прямой видимости: ступеньки сетки в длинные отрезки, переходные на месте."""
+    out = [pts[0]]
+    i = 0
+    while i < len(pts) - 1:
+        j = i + 1
+        if pts[j][2] == pts[i][2]:
+            k = j
+            while k + 1 < len(pts) and pts[k + 1][2] == pts[i][2] and clear_line(g, pts[i], pts[k + 1]):
+                k += 1
+            j = k
+        out.append(pts[j])
+        i = j
+    return out
+
+
+def emit(board, g, path, w, netinfo):
+    """Путь A* в дорожки и переходные на плате; возвращает число переходных."""
     # отрезки: подряд идущие шаги одного направления на одном слое
     pts = [path[0]]
     for a, b, c in zip(path, path[1:], path[2:]):
         if a[2] != b[2] or b[2] != c[2] or (b[0] - a[0], b[1] - a[1]) != (c[0] - b[0], c[1] - b[1]):
             pts.append(b)
     pts.append(path[-1])
+    pts = simplify(g, pts)
     xy = lambda p: (g.ox + p[0] * STEP, g.oy + p[1] * STEP)  # noqa: E731
     lay_k = (pcbnew.F_Cu, pcbnew.B_Cu)
     nvias = 0
@@ -220,7 +275,7 @@ def route(board, spec):
             nvias += 1
         elif a != b:
             add_track(board, xy(a), xy(b), w, lay_k[a[2]], netinfo)
-    return f"{spec}: проложено, переходных {nvias}"
+    return nvias
 
 
 def net_specs(board, name):

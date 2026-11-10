@@ -4,8 +4,8 @@
 
 План:
 
-- Zephyr / nRF Connect SDK v2.8.0 (см. раздел «Версия SDK»), модуль u-blox ANNA-B402 (nRF52833, 512 КБ флеш, 128 КБ ОЗУ). Пока нет своего board definition, сборка под `nrf52833dk/nrf52833`.
-- Выводы модуля: карта в [hardware/cricket-tag/README.md](../hardware/cricket-tag/README.md#схема) (D-24). NFC-выводы перевести в GPIO (`CONFIG_NFCT_PINS_AS_GPIOS`).
+- Zephyr / nRF Connect SDK v2.8.0 (см. раздел «Версия SDK»), модуль Insight SiP ISP2454-LX (nRF54L15, 1,5 МБ RRAM, 256 КБ ОЗУ; D-29, до этого u-blox ANNA-B402 на nRF52833). Пока нет своего board definition, сборка под `nrf54l15dk/nrf54l15/cpuapp`, отладочная плата — nRF54L15 DK.
+- Выводы модуля: карта в [hardware/cricket-tag/README.md](../hardware/cricket-tag/README.md#схема) (D-29). На NFC-выводах P1.02/P1.03 — I2C: перевести их в GPIO (`CONFIG_NFCT_PINS_AS_GPIOS`). На P2 нет прерываний: CHRG_N читать опросом. Пищалка — PWM20 на P1.04; GRTC PWM (128 Гц) не годится.
 - Apple Find My и Google Find Hub: интеграция Everytag.
 - Свои наборы рекламы: Cricket Coded (Coded PHY S8, +8 dBm, подключаемый) и Cricket 1M для телефонов без Coded PHY.
 - Режимы ON_DRONE, ESCALATE, ALARM, BEACON, STANDBY, LOW_BAT, SHIP.
@@ -18,10 +18,20 @@
 - Чтение GPS с полётника по MSP, последние координаты в рекламе Cricket.
 - Кнопка: выключение тревоги, привязка, режим хранения, загрузчик.
 - Обновление прошивки по BLE (MCUboot + SMP).
-- Источник LFCLK: внешний кварц 32,768 кГц (LFXO).
+- Источник LFCLK: кварц 32,768 кГц внутри модуля (LFXO, нагрузочные ёмкости внутренние). Datasheet ISP2454 R7, разд. 2.5, рекомендует в overlay `&lfxo { load-capacitors = "internal"; load-capacitance-femtofarad = <19000>; };` и, если в перечне значений binding `nordic,nrf54l-lfxo.yaml` нет 19000, добавить его. У nRF54L15 DK значение другое: при сборке под DK его не трогать, поставить в своём board definition.
 - Сканирование в приложении на Pixel: режим PHY_LE_ALL_SUPPORTED, не только Coded. Подробности в [docs/app.md](../docs/app.md).
 
 ## Объём флеш-памяти
+
+Проверено 2026-11-10 (D-29): Everytag (`main`, `prj-smpsvr-lowpower.conf`, MCUboot с двумя слотами, OTA через mcumgr) собирается на **SDK v2.8.0** под `nrf54l15dk/nrf54l15/cpuapp`. Overlay `nrf54l15dk.overlay` из Everytag нужно передать явно (`-DEverytag_DTC_OVERLAY_FILE=…/nrf54l15dk.overlay`): по полному имени платы он не подхватывается, и сборка падает на `watchdog.c` (не включён `wdt31`).
+
+| Часть | Занято | Доступно | % |
+|---|---|---|---|
+| MCUboot | 36,0 КБ | 48 КБ | 73 % |
+| Приложение (слот) | 201,0 КБ | 674 КБ | 30 % |
+| ОЗУ приложения | 53,9 КБ | 188 КБ | 29 % |
+
+Запас под наш код большой. Ниже — прежний расчёт для nRF52833 (ANNA-B402, до D-29).
 
 Проверено 2026-11-09: Everytag (коммит из `main`, конфигурация `prj-smpsvr-lowpower.conf`, MCUboot с двумя слотами, OTA через mcumgr) собран для платы KKM K4P на nRF52833 — это тот же чип, что в ANNA-B402.
 
@@ -46,5 +56,5 @@
 Everytag собирается только на nRF Connect SDK **v2.8.0**: в v3.4.2 изменился Bluetooth-API (`bt_hci_cmd_create`, `BT_LE_ADV_OPT_CONNECTABLE`, `bt_uuid_cmp`) и формат описания плат. Обе версии установлены. Ревизия A прошивки ведётся на v2.8.0, перенос на 3.x — отдельная задача.
 
 ```bash
-nrfutil sdk-manager toolchain launch --ncs-version v2.8.0 -- west build -b nrf52833dk/nrf52833 --sysbuild <app> -d <build-dir>
+nrfutil sdk-manager toolchain launch --ncs-version v2.8.0 -- west build -b nrf54l15dk/nrf54l15/cpuapp --sysbuild <app> -d <build-dir>
 ```

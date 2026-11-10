@@ -320,7 +320,7 @@ class Schematic:
             "\t(title_block",
             '\t\t(title "Cricket Tag")',
             '\t\t(rev "A")',
-            '\t\t(comment 1 "Ultra-light BLE crash beacon, u-blox ANNA-B402 (nRF52833)")',
+            '\t\t(comment 1 "Ultra-light BLE crash beacon, Insight SiP ISP2454-LX (nRF54L15)")',
             "\t)",
             "\t(lib_symbols",
             *libs,
@@ -435,64 +435,63 @@ def power_section(s):
         s.flag(net, 75 + 4 * i, 12)
 
 
-# Назначение выводов ANNA-B402 (номер площадки → цепь). Только наружный ряд
-# площадок и верхний ряд 40–42: внутренние ряды на 2 слоях без via не вывести.
-# Выводы «low-frequency only» (19, 20, 27–30) — только медленные сигналы.
+# Назначение выводов ISP2454-LX (номер площадки → цепь), D-29. Только наружный ряд
+# площадок: между ними 0,25 мм, на двух слоях дорожку не провести. Исключение — UART_RX
+# с внутренней площадки 29 через закрытое маской переходное под модулем (как SWD в D-28).
+# Порты nRF54L15: P2 без прерываний и пробуждения; АЦП, PWM, I2C/UART20 — на P1;
+# UARTE30 — на P0; SCL — только на «тактовом» выводе (P1.03). Верхний ряд модуля слева
+# направо: UART_TX, VIN_SENSE, VBAT_SENSE (вниз к резисторам), дальше — то, что идёт вправо.
 GPIO_MAP = {
-    14: "UART_TX",     # P0.11 → RX полётника через 1 кОм
-    15: "UART_RX",     # P0.12 ← TX полётника через 1 кОм
-    16: "BUZ_DIN",     # P1.00 (SWO) — ШИМ 4 кГц на PAM8904E
-    19: "VBAT_SENSE",  # P0.03/AIN1, LF
-    20: "VIN_SENSE",   # P0.02/AIN0, LF — есть ли 5 В, будит из System OFF
-    27: "LED",         # P0.31, LF — затвор 2N7002
-    28: "CHRG_N",      # P0.30, LF — открытый сток TP4054, внутренняя подтяжка
-    29: "BUTTON",      # P0.29, LF — кнопка на GND, внутренняя подтяжка
-    30: "ACC_INT1",    # P0.28, LF — прерывание LIS2DH12
-    31: "BUZ_EN1",     # P0.27 — режим PAM8904E
-    32: "I2C_SCL",     # P0.06
-    33: "I2C_SDA",     # P0.26
+    32: "UART_TX",     # P0.02 (UARTE30) → RX полётника через 1 кОм
+    29: "UART_RX",     # P0.00 (UARTE30) ← TX полётника через 1 кОм; внутренняя площадка
+    34: "VIN_SENSE",   # P0.03 — есть ли 5 В (цифровой вход, делитель D-23), будит из System OFF
+    36: "VBAT_SENSE",  # P1.07/AIN3
+    38: "BUTTON",      # P1.05 — кнопка на GND, внутренняя подтяжка, будит из System OFF
+    40: "BUZ_DIN",     # P1.04 — PWM20, 3–8 кГц на PAM8904E
+    42: "BUZ_EN1",     # P2.05 — режим PAM8904E
+    44: "CHRG_N",      # P2.04 — открытый сток TP4054, внутренняя подтяжка, опросом
+    46: "LED",         # P2.02 — затвор 2N7002, по каналу под модулем к R9 и Q1
+    48: "ACC_INT1",    # P1.11 — прерывание LIS2DH12
+    2: "I2C_SDA",      # P1.02 (NFC1 → GPIO)
+    4: "I2C_SCL",      # P1.03 (NFC2 → GPIO, тактовый вывод)
 }
+GND_USED = (1, 7, 8, 21, 23, 24, 25, 31)   # 12, 14, 16, 18 — внутренние, не подключаются
 
 
 def module_section(s):
-    """Шаг 3: ANNA-B402, кварц 32,768 кГц, развязка, площадки SWD."""
-    s.text(84, 45, "Модуль: u-blox ANNA-B402 (nRF52833), кварц 32,768 кГц, SWD", 1.8)
-    u1 = s.place("cricket:ANNA-B402", "U1", 120, 64, "ANNA-B402-00B",
-                 footprint="cricket:ANNA-B402_CornerAntenna", lcsc="C6124130",
-                 fields={"MPN": "ANNA-B402-00B", "Manufacturer": "u-blox"})
-    s.connect(u1, 9, "+3V3", stub=2)
-    s.connect(u1, 42, "SWDIO", stub=2)
-    s.connect(u1, 41, "SWDCLK", stub=2)
-    s.connect(u1, 17, "XL1", stub=2)
-    s.connect(u1, 18, "XL2", stub=2)
-    # Встроенная антенна: ANT ↔ ANT_INT, ANT_PCB — к противовесу в футпринте
-    s.connect_pins(u1, 6, u1, 5)
-    for n in (1, 2, 3, 12, 21, 34, 35):
-        s.no_connect(u1, n)
-    s.text(91, 85, "ANT ↔ ANT_INT перемычкой; ANT_PCB (1) — противовес\\nв футпринте; ANT_GND1/2 при установке в углу\\nне подключаются. USB, VBUS, ~{RESET} не используются.")
-    gpio = [int(n) for n in u1.pins if n not in ("9", "21", "12", "42", "41", "16", "17", "18",
-                                                 "6", "5", "1", "2", "3", "34", "35")
-            and u1.pins[n][0] > 0]
-    for n in [16] + gpio:
+    """Шаг 3: ISP2454-LX (D-29), площадки SWD. Кварцы и развязка — внутри модуля."""
+    s.text(84, 45, "Модуль: Insight SiP ISP2454-LX (nRF54L15), SWD", 1.8)
+    u1 = s.place("cricket:ISP2454-LX", "U1", 120, 64, "ISP2454-LX",
+                 footprint="cricket:ISP2454-LX_CornerAntenna", lcsc="C44975104",
+                 fields={"MPN": "ISP2454-LX-RS", "Manufacturer": "Insight SiP"})
+    s.connect(u1, 26, "+3V3", stub=2)
+    s.connect(u1, 28, "SWDIO", stub=2)
+    s.connect(u1, 30, "SWDCLK", stub=2)
+    s.no_connect(u1, 13)
+    # Встроенная антенна: OUT_MOD ↔ OUT_ANT
+    s.connect_pins(u1, 22, u1, 20)
+    s.text(91, 85, "OUT_MOD ↔ OUT_ANT перемычкой. ~{RESET} не используется\\n"
+                   "(подтяжка внутри). Кварцы 32 МГц и 32,768 кГц, DC/DC\\n"
+                   "и развязка VDD — внутри модуля. GND 12, 14, 16, 18 —\\n"
+                   "внутренние площадки, на двух слоях не выводятся\\n"
+                   "(datasheet ISP2454, разд. 4.2: только наружные).")
+    for n in sorted(int(k) for k in u1.pins if u1.pins[k][0] > 15):
         if n in GPIO_MAP:
             s.connect(u1, n, GPIO_MAP[n], stub=2)
         else:
             s.no_connect(u1, n)
-    s.connect(u1, 4, "GND")
-
-    # Развязка VCC модуля
-    cap(s, "C6", 100, 53, "100nF", "C1525", "+3V3")
-    cap(s, "C7", 104, 53, "1µF 25V", "C52923", "+3V3")
-
-    # Кварц 32,768 кГц (D-16): CL 12,5 пФ → 2 × 18 пФ
-    y1 = s.place("Device:Crystal", "Y1", 96, 66, "32,768kHz",
-                 footprint="Crystal:Crystal_SMD_2012-2Pin_2.0x1.2mm", lcsc="C55208",
-                 fields={"MPN": "X1A0000610002", "Manufacturer": "Seiko Epson"},
-                 ref_at=(0, -2), val_at=(0, 2))
-    s.connect(y1, 1, "XL1", stub=2)
-    s.connect(y1, 2, "XL2", stub=2)
-    cap(s, "C8", 91, 71, "18pF", "C1549", "XL1")
-    cap(s, "C9", 101, 71, "18pF", "C1549", "XL2")
+    # GND двумя группами (1, 7, 8 и 21…31): общий провод по концам выводов, символ земли под первым
+    for group in ((1, 7, 8), (21, 23, 24, 25, 31)):
+        ends = [u1.pin(n)[0] for n in group]
+        for a_, b_ in zip(ends, ends[1:]):
+            s.wire(a_, b_)
+        for e in ends[1:-1]:
+            s.junction(e)
+        s.wire(ends[0], (ends[0][0], ends[0][1] + G))
+        s.junction(ends[0])
+        s.power("GND", (ends[0][0], ends[0][1] + G), (0, 1))
+    for n in (12, 14, 16, 18):
+        s.no_connect(u1, n)
 
     # Площадки SWD снизу под аккумулятором (D-26): только медь, в BOM не входят
     j3 = s.place("Connector_Generic:Conn_01x04", "J3", 96, 92, "SWD",

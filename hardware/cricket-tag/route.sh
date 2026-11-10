@@ -15,7 +15,7 @@ q() { grep -v "memory leak\|GetWidth\|image handler" || true; }
 
 kicad-cli sch export netlist cricket-tag.kicad_sch -o "$TMP/cricket.net" >/dev/null
 $KICAD_PY gen_pcb.py "$TMP/cricket.net" 2>&1 | q
-$KICAD_PY export_dsn.py "$TMP/cricket-tag.dsn" --planes 2>&1 | q
+$KICAD_PY export_dsn.py "$TMP/cricket-tag.dsn" 2>&1 | q   # GND разводится дорожками, без --planes (D-29)
 "$JAVA" -jar "$FREEROUTING" -de "$TMP/cricket-tag.dsn" -do "$TMP/cricket-tag.ses" -mp 150 \
   --gui.enabled=false --usage_and_diagnostic_data.disable_analytics=true --api_server.enabled=false \
   > "$TMP/freerouting.log" 2>&1
