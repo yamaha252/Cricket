@@ -1,0 +1,20 @@
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * nRF54L15 DK stand-in for the cricket-tag board:
+ *  - buzzer PWM -> LED1 (P1.10, PWM20 channel 0); a piezo can be wired there
+ *  - flash LED  -> LED0
+ *  - button     -> Button 0; Buttons 1-3 simulate inputs (CONFIG_CRICKET_DK_SIM)
+ * No battery divider: battery voltage is not measured on the DK.
+ */
+
+/ {
+	aliases {
+		buzzer-pwm = &pwm_led1;
+		flash-led = &led0;
+		user-button = &button0;
+		sim-vin = &button1;
+		sim-armed = &button2;
+		sim-impact = &button3;
+	};
+};

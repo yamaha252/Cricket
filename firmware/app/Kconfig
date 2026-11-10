@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT
+
+menu "Cricket"
+
+config CRICKET_DK_SIM
+	bool "Simulate flight-controller inputs with development kit buttons"
+	help
+	  Button 1 toggles 5 V presence, button 2 toggles the armed state
+	  reported over MSP, button 3 simulates an impact. Only for the
+	  nRF54L15 DK, where the real inputs are absent.
+
+config CRICKET_BUZZER_FREQ_HZ
+	int "Buzzer drive frequency"
+	default 4000
+	help
+	  CPT-1117-83 is loud across 3-8 kHz; tune by measurement.
+
+config CRICKET_RSSI_1M
+	int "Calibrated RSSI at 1 m, dBm"
+	default -59
+	range -128 0
+
+endmenu
+
+source "Kconfig.zephyr"
