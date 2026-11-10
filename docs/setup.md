@@ -34,8 +34,7 @@ hardware/cricket-tag/make_fab.sh
 ```bash
 brew install --cask nrfutil        # Nordic nrfutil
 nrfutil install sdk-manager device
-nrfutil sdk-manager install v3.4.2 # SDK + toolchain в /opt/nordic/ncs (несколько ГБ)
-nrfutil sdk-manager install v2.8.0 # нужен для Everytag, на нём ведётся прошивка ревизии A
+nrfutil sdk-manager install v3.4.2 # SDK + toolchain в /opt/nordic/ncs (несколько ГБ), на нём ведётся прошивка (D-32)
 brew install dtc probe-rs-tools
 brew install --cask segger-jlink   # просит пароль администратора
 ```
@@ -77,7 +76,7 @@ nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54
 |---|---|---|
 | KiCad | 10.0.8 | `/Applications/KiCad`, `kicad-cli` в PATH |
 | nrfutil | 9.0.0 | `/opt/homebrew/bin/nrfutil`, плагины sdk-manager, device |
-| nRF Connect SDK + toolchain | v3.4.2 и v2.8.0 | через `nrfutil sdk-manager`; прошивка на v2.8.0 из-за Everytag |
+| nRF Connect SDK + toolchain | v3.4.2 и v2.8.0 | через `nrfutil sdk-manager`; прошивка на v3.4.2 (D-32); v2.8.0 ставился для Everytag и не используется |
 | SEGGER J-Link | 9.92 | `/Applications/SEGGER/JLink`, `JLinkExe` в `/usr/local/bin` |
 | probe-rs | 0.32 | поддерживает nRF54L15 |
 | dtc, poppler | brew | |

@@ -27,7 +27,8 @@ Priorities, in order: weight and size, power, range. Expected line-of-sight rang
 - Power: Li-Po 1S with built-in PCM, TP4054 (C32574) from the FC's 5 V, TPS7A0233 3.3 V LDO (D-14). Module never above 3.6 V. White LED and PAM8904E run from VBAT.
 - Buzzer: Same Sky CPT-1117-83-SMT-TR (11 × 9 × 1.7 mm, tabs make it 15 × 9, pads 15.5 × 9 mm, ≥83 dB at 5 Vpp, broad 3–8 kHz response, LCSC C22359733 but bought via Global Sourcing) driven by PAM8904E (D-27, reverts D-25; CPT-9019A footprint kept as the fallback). The radio module and the buzzer go through Global Sourcing. Buzzer is event-driven, it dominates the energy budget.
 - Crash detection: MSP armed status over UART, LIS2DH12 impact, escalating alarm as fallback. Battery swaps and storage must not trigger a loud alarm. A button is required.
-- Radio: Apple Find My + Google Find Hub (via Everytag) + own Cricket sets on Coded PHY S8 (+8 dBm) and 1M. The owner's phone is a Pixel 7 Pro: scan with PHY_LE_ALL_SUPPORTED, not Coded only (Pixel bug). Radio is silent while the drone is armed (ELRS coexistence). Android app first.
+- Firmware is our own, MIT (D-32): Everytag (GPLv3) is a reference only, never copy its code. Official Apple MFi Find My and Google-certified Find Hub (Fast Pair `locator_tag`) are out of reach and not considered. Order: own search mechanism (Cricket sets, modes, drivers) first, Apple/Google sets later.
+- Radio: own Cricket sets on Coded PHY S8 (+8 dBm) and 1M, later Apple Find My (OpenHaystack format) + Google Find Hub (FHN format, static EID first); all sets advertise concurrently via extended advertising, each with its own identity address. Crowd-network locations are fetched by our own app under the user's accounts, no server of ours (D-33; Apple anisette generated on the phone from Apple Music libs, unproven). The owner's phone is a Pixel 7 Pro: scan with PHY_LE_ALL_SUPPORTED, not Coded only (Pixel bug). Radio is silent while the drone is armed (ELRS coexistence). Android app first.
 
 ## Layout
 
@@ -50,10 +51,10 @@ Both must report 0 violations before fabrication outputs are generated. On the e
 
 ## Firmware toolchain
 
-nRF Connect SDK v3.4.2 and v2.8.0 are installed through `nrfutil sdk-manager` (under `/opt/nordic/ncs`). Firmware rev A targets **v2.8.0**, because Everytag does not build on 3.x (Bluetooth API changes); see `firmware/README.md`. Build inside the toolchain shell so the system Python is never used:
+nRF Connect SDK v3.4.2 and v2.8.0 are installed through `nrfutil sdk-manager` (under `/opt/nordic/ncs`). Firmware targets **v3.4.2** (D-32); v2.8.0 was only needed for Everytag and is unused. See `firmware/README.md`. Build inside the toolchain shell so the system Python is never used:
 
 ```bash
-nrfutil sdk-manager toolchain launch --ncs-version v2.8.0 -- west build -b <board> --sysbuild firmware/app -d firmware/build
+nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b <board> --sysbuild firmware/app -d firmware/build
 ```
 
 Flash with `west flash` (J-Link, installed) or `probe-rs run --chip nRF54L15_xxAA ...`. Until a board definition for the ISP2454-LX board exists, build for `nrf54l15dk/nrf54l15/cpuapp` (D-29); the development kit is the nRF54L15 DK.

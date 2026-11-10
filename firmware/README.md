@@ -2,12 +2,21 @@
 
 Не начата. Поведение описано в [docs/concept.md](../docs/concept.md#режимы-работы).
 
+Прошивка своя, под MIT (D-32). Everytag (GPLv3) — только справочник: его код не копируется, форматы пакетов берутся из открытых описаний.
+
+Порядок работ (D-32):
+
+1. Свой механизм поиска на nRF54L15 DK: наборы рекламы Cricket Coded и Cricket 1M, режимы, драйверы, команда «пищи» из приложения.
+2. Позже — наборы Apple Find My и Google Find Hub; координаты из сетей опрашивает приложение (D-33, [docs/app.md](../docs/app.md#краудсорсинговые-сети)).
+
 План:
 
-- Zephyr / nRF Connect SDK v2.8.0 (см. раздел «Версия SDK»), модуль Insight SiP ISP2454-LX (nRF54L15, 1,5 МБ RRAM, 256 КБ ОЗУ; D-29). Пока нет своего board definition, сборка под `nrf54l15dk/nrf54l15/cpuapp`, отладочная плата — nRF54L15 DK.
+- Zephyr / nRF Connect SDK v3.4.2 (см. раздел «Версия SDK»), модуль Insight SiP ISP2454-LX (nRF54L15, 1,5 МБ RRAM, 256 КБ ОЗУ; D-29). Пока нет своего board definition, сборка под `nrf54l15dk/nrf54l15/cpuapp`, отладочная плата — nRF54L15 DK.
 - Выводы модуля: карта в [hardware/cricket-tag/README.md](../hardware/cricket-tag/README.md#схема) (D-29). На NFC-выводах P1.02/P1.03 — I2C: перевести их в GPIO (`CONFIG_NFCT_PINS_AS_GPIOS`). На P2 нет прерываний: CHRG_N читать опросом. Пищалка — PWM20 на P1.04; GRTC PWM (128 Гц) не годится.
-- Apple Find My и Google Find Hub: интеграция Everytag.
 - Свои наборы рекламы: Cricket Coded (Coded PHY S8, +8 dBm, подключаемый) и Cricket 1M для телефонов без Coded PHY.
+- Наборы рекламы одновременно, через extended advertising: у каждого набора свой identity-адрес (`bt_id_create`, `CONFIG_BT_ID_MAX`, `CONFIG_BT_EXT_ADV_MAX_ADV_SET`), адрес Apple меняется через `bt_id_reset` при остановленном наборе. У Everytag одна реклама за раз и смена публичного адреса всего контроллера — так делать не нужно.
+- Apple Find My (позже): формат OpenHaystack — шаблон рекламы 31 байт, адрес из первых 6 байт публичного ключа P-224 (старшие биты 11, статический случайный адрес), до N ключей со сменой по таймеру. Ключи генерирует приложение при привязке и записывает в маячок по своему GATT-сервису.
+- Google Find Hub (позже): формат FHN с ключом, полученным приложением; сначала постоянный EID, сменный EID по спецификации FHN (AES, secp160r1, micro-ecc) — доработка, для неё нужны непрерывные часы (SHIP как System ON с GRTC).
 - Режимы ON_DRONE, ESCALATE, ALARM, BEACON, STANDBY, LOW_BAT, SHIP.
 - Признаки падения: MSP_STATUS (armed) по UART, удар по LIS2DH12, нарастание тревоги как запасной вариант.
 - LIS2DH12 на I2C по адресу 0x19 (SA0 на VDD_IO), прерывание по удару на INT1 (ACC_INT1).
@@ -23,7 +32,7 @@
 
 ## Объём флеш-памяти
 
-Проверено 2026-11-10 (D-29): Everytag (`main`, `prj-smpsvr-lowpower.conf`, MCUboot с двумя слотами, OTA через mcumgr) собирается на **SDK v2.8.0** под `nrf54l15dk/nrf54l15/cpuapp`. Overlay `nrf54l15dk.overlay` из Everytag нужно передать явно (`-DEverytag_DTC_OVERLAY_FILE=…/nrf54l15dk.overlay`): по полному имени платы он не подхватывается, и сборка падает на `watchdog.c` (не включён `wdt31`).
+Оценка по Everytag как образцу похожей прошивки. Проверено 2026-11-10 (D-29): Everytag (`main`, `prj-smpsvr-lowpower.conf`, MCUboot с двумя слотами, OTA через mcumgr) собирается на **SDK v2.8.0** под `nrf54l15dk/nrf54l15/cpuapp`. Overlay `nrf54l15dk.overlay` из Everytag нужно передать явно (`-DEverytag_DTC_OVERLAY_FILE=…/nrf54l15dk.overlay`): по полному имени платы он не подхватывается, и сборка падает на `watchdog.c` (не включён `wdt31`).
 
 | Часть | Занято | Доступно | % |
 |---|---|---|---|
@@ -31,20 +40,31 @@
 | Приложение (слот) | 201,0 КБ | 674 КБ | 30 % |
 | ОЗУ приложения | 53,9 КБ | 188 КБ | 29 % |
 
-Запас под наш код большой. Наши добавления: набор рекламы на Coded PHY, драйвер LIS2DH12, MSP по UART, управление PAM8904E и светодиодом, режимы. Если запаса не хватит:
+Запас под нашу прошивку большой: к тому же объёму добавятся наборы рекламы на Coded PHY, драйвер LIS2DH12, MSP по UART, управление PAM8904E и светодиодом, режимы. Если запаса не хватит:
 
 - убрать из mcumgr статистику и taskstat (`CONFIG_STATS`, `CONFIG_MCUMGR_GRP_OS_TASKSTAT`, `CONFIG_MCUMGR_GRP_STAT`);
 - уменьшить раздел настроек NVS;
 - перейти на MCUboot с одним слотом и обновлением по последовательному каналу (теряется OTA по BLE).
 
-## Порт Everytag на SDK 3.4.2
+## Порт Everytag на SDK 3.4.2 (справочно)
 
 Проверено 2026-11-09: Everytag собирается на SDK 3.4.2 после правки трёх строк — `bt_hci_cmd_create(...)` → `bt_hci_cmd_alloc(K_FOREVER)` в `src/main.c`, `BT_LE_ADV_OPT_CONNECTABLE` → `BT_LE_ADV_OPT_CONN` и `&auth_uuid` → `&auth_uuid.uuid` в `src/settings.c`; из конфигурации убран `CONFIG_RAM_POWER_ADJUST_ON_HEAP_RESIZE`. Под `nrf54l15dk/nrf54l10/cpuapp` с MCUboot: приложение 186 КБ из 444 КБ, MCUboot 40 КБ из 62 КБ, ОЗУ 56 КБ из 192 КБ. Работа на железе не проверена.
 
 ## Версия SDK
 
-Everytag собирается только на nRF Connect SDK **v2.8.0**: в v3.4.2 изменился Bluetooth-API (`bt_hci_cmd_create`, `BT_LE_ADV_OPT_CONNECTABLE`, `bt_uuid_cmp`) и формат описания плат. Обе версии установлены. Ревизия A прошивки ведётся на v2.8.0, перенос на 3.x — отдельная задача.
+Прошивка ведётся на nRF Connect SDK **v3.4.2** (D-32), последнем выпуске на 2026-11-11. Раньше выбирался v2.8.0 только потому, что Everytag не собирается на 3.x (D-18); своя прошивка от этого не зависит. v2.8.0 остаётся установленным, но не используется.
 
 ```bash
-nrfutil sdk-manager toolchain launch --ncs-version v2.8.0 -- west build -b nrf54l15dk/nrf54l15/cpuapp --sysbuild <app> -d <build-dir>
+nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54l15dk/nrf54l15/cpuapp --sysbuild firmware/app -d firmware/build
 ```
+
+Примеры кода для Bluetooth из интернета часто написаны под старый API: в 3.x, например, `BT_LE_ADV_OPT_CONNECTABLE` заменён на `BT_LE_ADV_OPT_CONN`, а `bt_hci_cmd_create` на `bt_hci_cmd_alloc`.
+
+## Everytag как справочник
+
+Что полезно посмотреть в [Everytag](https://github.com/vasimv/Everytag), не копируя код:
+
+- после работы через J-Link RTT nRF держит ток в миллиамперах до снятия питания, программный сброс не помогает — замерять ток только после передёргивания питания;
+- overlay для nRF54L15 DK включает `wdt31` и канал АЦП на VDD;
+- настройки и ключи — в отдельном разделе NVS, переживают OTA; при первой прошивке стирать флеш целиком;
+- приём настроек по BLE короткими окнами (2 с в минуту), чтобы не тратить ток на подключаемую рекламу.
