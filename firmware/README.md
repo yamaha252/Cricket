@@ -4,7 +4,7 @@
 
 План:
 
-- Zephyr / nRF Connect SDK v2.8.0 (см. раздел «Версия SDK»), модуль Insight SiP ISP2454-LX (nRF54L15, 1,5 МБ RRAM, 256 КБ ОЗУ; D-29, до этого u-blox ANNA-B402 на nRF52833). Пока нет своего board definition, сборка под `nrf54l15dk/nrf54l15/cpuapp`, отладочная плата — nRF54L15 DK.
+- Zephyr / nRF Connect SDK v2.8.0 (см. раздел «Версия SDK»), модуль Insight SiP ISP2454-LX (nRF54L15, 1,5 МБ RRAM, 256 КБ ОЗУ; D-29). Пока нет своего board definition, сборка под `nrf54l15dk/nrf54l15/cpuapp`, отладочная плата — nRF54L15 DK.
 - Выводы модуля: карта в [hardware/cricket-tag/README.md](../hardware/cricket-tag/README.md#схема) (D-29). На NFC-выводах P1.02/P1.03 — I2C: перевести их в GPIO (`CONFIG_NFCT_PINS_AS_GPIOS`). На P2 нет прерываний: CHRG_N читать опросом. Пищалка — PWM20 на P1.04; GRTC PWM (128 Гц) не годится.
 - Apple Find My и Google Find Hub: интеграция Everytag.
 - Свои наборы рекламы: Cricket Coded (Coded PHY S8, +8 dBm, подключаемый) и Cricket 1M для телефонов без Coded PHY.
@@ -31,17 +31,7 @@
 | Приложение (слот) | 201,0 КБ | 674 КБ | 30 % |
 | ОЗУ приложения | 53,9 КБ | 188 КБ | 29 % |
 
-Запас под наш код большой. Ниже — прежний расчёт для nRF52833 (ANNA-B402, до D-29).
-
-Проверено 2026-11-09: Everytag (коммит из `main`, конфигурация `prj-smpsvr-lowpower.conf`, MCUboot с двумя слотами, OTA через mcumgr) собран для платы KKM K4P на nRF52833 — это тот же чип, что в ANNA-B402.
-
-| Часть | Занято | Доступно | % |
-|---|---|---|---|
-| MCUboot | 32,9 КБ | 48 КБ | 67 % |
-| Приложение (слот) | 185,1 КБ | 219,5 КБ | 82 % |
-| ОЗУ приложения | 51,6 КБ | 128 КБ | 40 % |
-
-Вывод: всё помещается, запас под наш код около 34 КБ. Наши добавления: набор рекламы на Coded PHY, драйвер LIS2DH12, MSP по UART, управление PAM8904E и светодиодом, режимы. Если запаса не хватит:
+Запас под наш код большой. Наши добавления: набор рекламы на Coded PHY, драйвер LIS2DH12, MSP по UART, управление PAM8904E и светодиодом, режимы. Если запаса не хватит:
 
 - убрать из mcumgr статистику и taskstat (`CONFIG_STATS`, `CONFIG_MCUMGR_GRP_OS_TASKSTAT`, `CONFIG_MCUMGR_GRP_STAT`);
 - уменьшить раздел настроек NVS;

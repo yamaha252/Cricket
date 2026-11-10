@@ -6,7 +6,7 @@
 
 ## Радиомодуль: Insight SiP ISP2454-LX
 
-Решение D-29 в [decisions.md](decisions.md) (заменяет D-15 с ANNA-B402). Данные по datasheet isp_ble_DS2454 R7 и datasheet nRF54L15; сравнение с другими модулями — [module-options.md](module-options.md).
+Решение D-29 в [decisions.md](decisions.md). Данные по datasheet isp_ble_DS2454 R7 и datasheet nRF54L15; сравнение с другими модулями — [module-options.md](module-options.md).
 
 | Параметр | Значение |
 |---|---|
@@ -22,7 +22,7 @@
 | Влагочувствительность | MSL 2 в таблице предельных значений, MSL-3 в разд. 7.2 — считать MSL 3 |
 | Сертификация | CE, FCC, IC, TELEC у модуля |
 | Наличие 2026-11-10 | Mouser: ISP2454-LX-RS 1 397 шт. (лента), ISP2454-LX-JT 838 шт. (лоток). На складе JLCPCB 0, предзаказ C44975104 |
-| Цена | 4,59 € (-JT) … 9,54 € (-RS) у Mouser; оценка JLCPCB для предзаказа ~19,9 $ — уточнить при заказе |
+| Цена | 4,59 € (-JT) … 9,54 € (-RS) у Mouser; 5,09–5,40 $ в магазине Insight SiP; оценка JLCPCB для предзаказа ~19,9 $ — уточнить при заказе, см. [cost.md](cost.md) |
 | Закупка | JLCPCB Global Sourcing у Mouser |
 
 ### Требования к встроенной антенне
@@ -194,7 +194,6 @@ TP4054 (datasheet TOPPOWER): утечка из аккумулятора при �
 
 - [Datasheet TP4054 (TOPPOWER)](https://datasheet.lcsc.com/datasheet/pdf/0b076ddf91114449998aff7a9f06b7d9.pdf?productCode=C32574), [datasheet PAM8904E](https://diodes.com/datasheet/download/PAM8904E.pdf)
 - [Datasheet ISP2454 R7](https://www.insightsip.com/fichiers_insightsip/pdf/ble/ISP2454/isp_ble_DS2454.pdf), [Insight SiP ISP2454](https://insightsip.com/bluetooth-modules/isp2454/), [Mouser ISP2454](https://eu.mouser.com/en/c/?q=ISP2454), [JLCPCB ISP2454](https://jlcpcb.com/parts/componentSearch?searchTxt=ISP2454&isSearch=true), [nRF54L15: назначение выводов](https://docs.nordicsemi.com/bundle/ps_nrf54L15/page/chapters/pin.html), [TPS7A02 datasheet](https://www.ti.com/lit/gpn/tps7a02)
-- Прежний модуль (D-15): [Datasheet ANNA-B402 R06](https://content.u-blox.com/sites/default/files/ANNA-B402_DataSheet_UBX-20032372.pdf), [руководство по интеграции ANNA-B4](https://content.u-blox.com/sites/default/files/ANNA-B4_SIM_UBX-21000517.pdf), [Octopart ANNA-B402](https://octopart.com/search?q=ANNA-B402), [JLCPCB ANNA-B402](https://jlcpcb.com/parts/componentSearch?searchTxt=ANNA-B402&isSearch=true), [LCSC кварц C55208](https://www.lcsc.com/product-detail/C55208.html)
 - [Datasheet BL54L15µ v0.6](https://docs.rs-online.com/5913/A700000013862904.pdf), [страница 453-00223C с наличием](https://www.ezurio.com/part/453-00223c), [Ezurio BL54L15µ](https://ezurio.com/wireless-modules/bluetooth-modules/bl54-series/bl54l15-micro-series-bluetooth-le-802-15-4-nfc), [Octopart 453-00223](https://octopart.com/search?q=453-00223)
 - [Raytac AN54LV-15](https://www.raytac.com/product/ins.php?index_id=169), [Octopart AN54LV-15](https://octopart.com/search?q=AN54LV-15), [DigiKey AN54LV-15](https://www.digikey.com/en/products/detail/raytac/AN54LV-15/27793700)
 - [HJ-N54L-SIP](https://www.digikey.com/en/products/detail/hjsip/HJ-N54L-SIP/28732673), [Fanstel BM15](https://fanstel.squarespace.com/bm15-nrf54l15-modules), [Ebyte E73-2G4M54LP](https://www.es-ebyte.com/products/E73-2G4M54LP(15)/7)

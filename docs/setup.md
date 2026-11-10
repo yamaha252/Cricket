@@ -63,7 +63,7 @@ west build -b nrf54l15dk/nrf54l15/cpuapp nrf/samples/bluetooth/peripheral_lbs -d
 nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54l15dk/nrf54l15/cpuapp <app> -d <build-dir>
 ```
 
-Целевая плата для `firmware/` — свой board definition под ISP2454-LX (nRF54L15, D-29), пока его нет, собирать под `nrf54l15dk/nrf54l15/cpuapp`; отладочная плата — nRF54L15 DK. До D-29 целью был `nrf52833dk/nrf52833`: Toolchain тот же. Проверено 2026-11-09: `peripheral_lbs` под `nrf52833dk/nrf52833` собирается, FLASH 177 КБ из 512 (35 %), RAM 28 КБ из 128 (22 %).
+Целевая плата для `firmware/` — свой board definition под ISP2454-LX (nRF54L15, D-29), пока его нет, собирать под `nrf54l15dk/nrf54l15/cpuapp`; отладочная плата — nRF54L15 DK.
 
 ## Прошивка на устройство
 
@@ -79,7 +79,7 @@ nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54
 | nrfutil | 9.0.0 | `/opt/homebrew/bin/nrfutil`, плагины sdk-manager, device |
 | nRF Connect SDK + toolchain | v3.4.2 и v2.8.0 | через `nrfutil sdk-manager`; прошивка на v2.8.0 из-за Everytag |
 | SEGGER J-Link | 9.92 | `/Applications/SEGGER/JLink`, `JLinkExe` в `/usr/local/bin` |
-| probe-rs | 0.32 | поддерживает nRF52833 и nRF54L15 |
+| probe-rs | 0.32 | поддерживает nRF54L15 |
 | dtc, poppler | brew | |
 | VS Code | nRF Connect extension pack | |
 
