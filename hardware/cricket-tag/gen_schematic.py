@@ -451,7 +451,6 @@ GPIO_MAP = {
     31: "BUZ_EN1",     # P0.27 — режим PAM8904E
     32: "I2C_SCL",     # P0.06
     33: "I2C_SDA",     # P0.26
-    40: "BUZ_EN2",     # P0.15 — режим PAM8904E
 }
 
 
@@ -507,13 +506,13 @@ def module_section(s):
 
 def buzzer_section(s):
     """Шаг 4: PAM8904E, режим 3x, дифференциальный выход на CPT-1117-83 (D-27)."""
-    s.text(4, 49, "Пищалка: PAM8904E от VBAT, 1x/2x/3x выбирает прошивка (EN1, EN2), ШИМ ~4,1 кГц на DIN", 1.8)
+    s.text(4, 49, "Пищалка: PAM8904E от VBAT, EN2 на VBAT, 1x или 3x выбирает прошивка через EN1, ШИМ на DIN", 1.8)
     u4 = s.place("cricket:PAM8904E", "U4", 30, 60, "PAM8904EGPR",
                  footprint="cricket:Diodes_W-QFN2020-12_2x2mm_P0.4mm_EP1.0x1.0mm", lcsc="C510550",
                  fields={"MPN": "PAM8904EGPR", "Manufacturer": "Diodes Incorporated"})
     s.connect(u4, 12, "VBAT", stub=2)
     s.connect(u4, 1, "BUZ_EN1", stub=2)
-    s.connect(u4, 2, "BUZ_EN2", stub=2)
+    s.connect(u4, 2, "VBAT", stub=2)  # EN2 = 1: режимы 1x (EN1 = 0) и 3x (EN1 = 1), D-28
     s.connect(u4, 3, "BUZ_DIN", stub=2)
     s.connect(u4, 9, "BUZ_CP1", stub=2)
     s.connect(u4, 4, "BUZ_CN1", stub=2)

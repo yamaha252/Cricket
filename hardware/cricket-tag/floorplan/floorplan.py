@@ -61,8 +61,26 @@ def place(fp, ref, x, y, rot=0, side="F"):
 BATTERY = (20.0, 10.0)  # 401020: длина × ширина
 
 
+def _pristine(text):
+    """Только заголовок, слои и настройки платы: детали и дорожки настоящей платы не нужны."""
+    sys.path.insert(0, os.path.join(PROJ, "lib"))
+    from symlib import sexpr_end
+    keep = ("version", "generator", "generator_version", "general", "paper", "title_block", "layers", "setup")
+    out, pos = [text[:text.index("\n") + 1]], text.index("\n") + 1
+    while True:
+        i = text.find("(", pos)
+        if i < 0:
+            break
+        e = sexpr_end(text, i)
+        if text[i + 1:e].split(None, 1)[0].rstrip(")") in keep:
+            out.append("\t" + text[i:e] + "\n")
+        pos = e
+    out.append('\t(net 0 "")\n)\n')
+    return "".join(out)
+
+
 def board(parts, W, L, out, battery=BATTERY):
-    pcb = open(f"{PROJ}/cricket-tag.kicad_pcb").read()
+    pcb = _pristine(open(f"{PROJ}/cricket-tag.kicad_pcb").read())
     edge = "".join(
         f'\t(gr_line (start {a}) (end {b}) (stroke (width 0.05) (type default)) (layer "Edge.Cuts"))\n'
         for a, b in [("0 0", f"{W} 0"), (f"{W} 0", f"{W} {L}"), (f"{W} {L}", f"0 {L}"), (f"0 {L}", "0 0")])
@@ -215,8 +233,93 @@ def variant_w18s():
     return p, W, L, (12.0, 10.0)
 
 
+def variant_w17b():
+    """w16b, раздвинутый под разводку (D-28): +1 мм ширины справа от модуля и излучателя,
+    +1 мм длины в колонке питания. Первый прогон Freerouting на 16 × 29,2 оставлял 13 соединений."""
+    p, W, L, bat = variant_w16b()
+    out = []
+    for fp, ref, x, y, *rest in p:
+        if ref == "U1":
+            pass
+        elif ref == "BZ1":
+            y += 0.5
+        elif x > 7.6 and y > 10.9:      # колонка справа от излучателя и драйвер
+            x += 1.0
+            y = 10.9 + (y - 10.9) * (19.3 / 18.3)
+        elif x > 7.6:                    # полоса рядом с модулем
+            x += 1.0
+        elif y > 13.0 and ref not in ("J1", "J2"):  # всё под излучателем
+            y += 1.0
+        out.append((fp, ref, round(x, 3), round(y, 3), *rest))
+    return out, W + 1, L + 1, bat
+
+
+def variant_w17c():
+    """17 × 31 мм, расстановка по выводам (D-28): под нижним рядом модуля кварц с C8/C9,
+    резисторы UART и делители VBAT/VIN; драйвер с конденсаторами вокруг его выводов;
+    светодиод рядом с ключом внизу справа; излучатель CPT-1117-83 под модулем."""
+    W, L = 17, 31.0
+    p = [
+        ("cricket:ANNA-B402_CornerAntenna", "U1", 3.95, 7.25),
+        # полоса рядом с модулем: акселерометр, подтяжки I2C, кнопка
+        ("Package_LGA:LGA-12_2x2mm_P0.5mm", "U5", 11.3, 7.2),
+        (C0402, "C16", 11.3, 5.45), (C0402, "C15", 11.3, 4.4),
+        (R0402, "R10", 11.3, 3.4), (R0402, "R11", 11.3, 2.4),
+        ("Button_Switch_SMD:SW_SPST_TS-1088-xR020", "SW1", 15.15, 3.9, 90),
+        # под модулем: развязка VCC, UART, кварц, делители
+        (C0402, "C7", 0.6, 11.75, 270), (C0402, "C6", 0.6, 13.7, 90),
+        (R0402, "R7", 1.8, 12.4, 90), (R0402, "R6", 2.8, 12.4, 90),
+        ("Crystal:Crystal_SMD_2012-2Pin_2.0x1.2mm", "Y1", 4.8, 11.85),
+        (C0402, "C8", 4.1, 13.85), (C0402, "C9", 6.1, 13.85),
+        (R0402, "R1", 7.2, 11.75, 90), (R0402, "R2", 8.2, 11.75, 270), (R0402, "R4", 9.2, 11.75, 270),
+        (R0402, "R5", 7.6, 13.7, 270), (C0402, "C3", 8.6, 13.7, 270),
+        # драйвер пищалки
+        ("cricket:Diodes_W-QFN2020-12_2x2mm_P0.4mm_EP1.0x1.0mm", "U4", 12.9, 12.6),
+        (C0603, "C10", 11.9, 10.45), (C0402, "C13", 14.6, 10.45), (C0402, "C14", 14.6, 9.45),
+        (C0402, "C12", 15.2, 12.4, 270), (C0402, "C11", 12.9, 14.6, 180),
+        # излучатель
+        ("cricket:SameSky_CPT-1117-83-SMT", "BZ1", 4.95, 22.7),
+        # колонка справа: зарядка, диод, LDO, светодиод
+        ("Package_TO_SOT_SMD:SOT-23-5", "U2", 12.0, 17.0), (R0402, "R3", 15.4, 16.2, 90),
+        (C0603, "C1", 16.1, 19.3, 90), (C0402, "C2", 11.0, 19.3),
+        ("Diode_SMD:D_SOD-123", "D1", 12.6, 20.95),
+        ("Package_TO_SOT_SMD:SOT-23-5", "U3", 12.0, 24.0),
+        (C0402, "C4", 15.2, 23.4, 90), (C0402, "C5", 16.2, 23.4, 90),
+        ("Package_TO_SOT_SMD:SOT-23", "Q1", 12.0, 27.5), (R0402, "R9", 11.9, 29.9),
+        ("LED_SMD:LED_0603_1608Metric", "D2", 15.6, 27.0, 90), (R0402, "R8", 15.6, 29.5),
+        # снизу, только медь
+        ("cricket:WirePads_1x04_P2.0mm", "J1", 4.2, 12.4, 0, "B"),
+        ("cricket:WirePads_1x02_P2.0mm", "J2", 13.0, 12.4, 0, "B"),
+        ("cricket:SWD_Pads_1x04_P2.54mm", "J3", 8.0, 25.0, 0, "B"),
+    ]
+    return p, W, L, (15.0, 10.0)
+
+
+def variant_w17d():
+    """w17c, у которого зона под модулем выше на 1 мм (17 × 32 мм): кварц, UART и делители
+    в два свободных ряда, всё ниже сдвинуто на 1 мм. На 17 × 31 там не хватало места дорожкам."""
+    p, W, L, bat = variant_w17c()
+    moved = {
+        "C7": (0.6, 11.75, 270), "C6": (0.6, 14.3, 90),
+        "R7": (1.8, 12.1, 90), "R6": (2.8, 12.1, 90),
+        "C8": (4.1, 14.0, 0), "C9": (6.1, 14.0, 0),
+        "R1": (7.2, 11.9, 90), "R2": (8.2, 11.9, 270), "R4": (9.2, 11.9, 270),
+        "R5": (7.6, 14.5, 270), "C3": (8.6, 14.5, 270),
+    }
+    out = []
+    for fp, ref, x, y, *rest in p:
+        rot = rest[0] if rest else 0
+        side = rest[1:] if len(rest) > 1 else []
+        if ref in moved:
+            x, y, rot = moved[ref]
+        elif ref == "BZ1" or (y > 15.0 and ref not in ("J1", "J2")):
+            y += 1.0
+        out.append((fp, ref, x, y, rot, *side))
+    return out, W, L + 1.0, bat
+
+
 if __name__ == "__main__":
-    r = {"w14": variant_w14, "w14s": variant_w14s, "w18s": variant_w18s, "w16b": variant_w16b}[sys.argv[1]]()
+    r = {"w14": variant_w14, "w14s": variant_w14s, "w18s": variant_w18s, "w16b": variant_w16b, "w17b": variant_w17b, "w17c": variant_w17c, "w17d": variant_w17d}[sys.argv[1]]()
     board(*r[:3], sys.argv[2], *r[3:])
     parts, W, L = r[:3]
     print(W, L)
