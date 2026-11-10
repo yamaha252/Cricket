@@ -263,6 +263,14 @@ def silk_text(board, text, x, y, layer, size=0.8, angle=0):
     board.Add(t)
 
 
+def swd_labels(board):
+    """Подписи площадок SWD J3 на нижней стороне: 1 VDD, 2 SWDIO, 3 SWCLK, 4 GND."""
+    j3 = board.FindFootprintByReference("J3")
+    for pad, txt in zip(sorted(j3.Pads(), key=lambda p: p.GetNumber()), ("V", "IO", "CK", "G")):
+        pos = pad.GetPosition()
+        silk_text(board, txt, pcbnew.ToMM(pos.x) - OX, pcbnew.ToMM(pos.y) - OY + 1.4, pcbnew.B_SilkS, 0.8)
+
+
 def main(netlist):
     comps, nets = read_netlist(netlist)
     parts, W, L, _battery = VARIANT()
@@ -318,6 +326,7 @@ def main(netlist):
         for pad, txt in zip(sorted(fp.Pads(), key=lambda p: p.GetNumber()), names):
             pos = pad.GetPosition()
             silk_text(board, txt, pcbnew.ToMM(pos.x) - OX, pcbnew.ToMM(pos.y) - OY + 1.9, pcbnew.B_SilkS, 0.8)
+    swd_labels(board)
 
     board.Save(PCB)
     print(f"{len(comps)} деталей, {len(nets)} цепей, плата {W} × {L} мм")
@@ -326,5 +335,9 @@ def main(netlist):
 if __name__ == "__main__":
     if sys.argv[1] == "--fields":
         sync_fields(sys.argv[2])
+    elif sys.argv[1] == "--swd-labels":   # только подписи J3 на готовой плате
+        _b = pcbnew.LoadBoard(PCB)
+        swd_labels(_b)
+        _b.Save(PCB)
     else:
         main(sys.argv[1])

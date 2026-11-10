@@ -25,6 +25,8 @@ $KICAD_CLI sch export bom     hardware/cricket-tag/cricket-tag.kicad_sch -o hard
   --group-by "Value,Footprint,LCSC Part" --ref-range-delimiter "" --exclude-dnp
 ```
 
+Разводка платы — Freerouting 2.5 (`freerouting-2.5.0.jar` из релизов github.com/freerouting/freerouting) под OpenJDK 27 из Homebrew (`brew install openjdk`, keg-only: вызывается как `/opt/homebrew/opt/openjdk/bin/java`, системная Java не меняется). Запуск — `hardware/cricket-tag/route.sh`, см. README платы.
+
 Плагины KiCad ставятся через Plugin and Content Manager в GUI: Interactive HTML BOM, Fabrication Toolkit (JLCPCB BOM/CPL), библиотека Espressif (для seeker, если понадобится ESP32).
 
 ## Прошивка (nRF Connect SDK, Zephyr)
@@ -67,7 +69,6 @@ nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54
 
 - J-Link (включая встроенный в nRF52833-DK): `west flash` или `nrfutil device program --firmware build/zephyr/zephyr.hex`.
 - Любой CMSIS-DAP / J-Link через probe-rs: `probe-rs run --chip nRF52833_xxAA build/zephyr/zephyr.elf`.
-- Разводка платы — Freerouting 2.5 (`freerouting-2.5.0.jar` из релизов github.com/freerouting/freerouting) под OpenJDK 27 из Homebrew (`brew install openjdk`, keg-only: вызывается как `/opt/homebrew/opt/openjdk/bin/java`, системная Java не меняется). Запуск — `hardware/cricket-tag/route.sh`, см. README платы.
 - У cricket-tag площадки SWD J3 снизу под аккумулятором: 1 VDD, 2 SWDIO, 3 SWCLK, 4 GND, шаг 2,54 мм, без отверстий. Прошивать до пайки аккумулятора, подпружиненными контактами или временными проводами (D-26).
 
 ## Что установлено (проверено 2026-11-09)

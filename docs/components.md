@@ -2,7 +2,7 @@
 
 Наличие и цены проверены 2026-11-09 в каталогах LCSC, JLCPCB и Octopart. Перед заказом проверить снова. Все позиции должны ставиться заводом JLCPCB, см. [manufacturing.md](manufacturing.md).
 
-Источник истины для BOM, пока нет схемы. При замене компонента обновить эту таблицу и [decisions.md](decisions.md).
+Схема готова, и заводской BOM собирается из полей `LCSC Part` её символов. Эта таблица объясняет выбор и расчёт номиналов; при замене компонента обновить схему (`gen_schematic.py`), эту таблицу и [decisions.md](decisions.md).
 
 ## Радиомодуль: u-blox ANNA-B402-00B
 
@@ -37,7 +37,7 @@
 
 Противовес, вырез и зона запрета уже заложены в футпринт `cricket:ANNA-B402_CornerAntenna` (D-22). На слое Cmts.User футпринта отмечены кромки, как у u-blox.
 
-Итог для платы: угол 7,2 × 10,5 мм занят модулем и антенной зоной. На плате 13 × 22 мм это помещается, остальное — сплошная земля.
+Итог для платы: угол 7,2 × 10,5 мм занят модулем и антенной зоной. На плате 17 × 32 мм (D-28) остальное — земля на обоих слоях.
 
 Отличия от u-blox:
 
@@ -92,7 +92,7 @@
 | Затвор 2N7002 | 10 кОм на землю | 0402 | C25744 | светодиод выключен при сбросе |
 | PAM8904E CIN | 2,2 мкФ 16 В | 0603 | C23630 | по схеме включения Diodes |
 | PAM8904E C1, C2 | 1 мкФ 25 В | 0402 | C52923 | |
-| PAM8904E COUT | 2 × 1 мкФ 25 В | 0402 | C52923 | на выходе до 12,6 В; 25 В вместо 16 В из-за потери ёмкости под напряжением |
+| PAM8904E COUT | 2 × 1 мкФ 25 В | 0402 | C52923 | на выходе до 12,6 В; 25 В вместо 16 В из-за потери ёмкости под напряжением. В типовой схеме Diodes COUT 2,2 мкФ; у 0402 под 12 В остаётся меньше половины номинала. Нагрузка — 13 нФ, пульсации малы; если на первых платах VOUT просядет, заменить на 2,2 мкФ 25 В 0603 |
 | ANNA-B402, LIS2DH12 развязка | 100 нФ + 1 мкФ | 0402 | C1525, C52923 | по datasheet |
 | Кварц 32,768 кГц | 2 × 18 пФ | 0402 | C1549 | C = 2 · CL − Cвыв − Cплаты = 2 · 12,5 − 5 − ~1 ≈ 19 пФ; ближайший Basic 18 пФ. Входная ёмкость выводов XL1/XL2 5 пФ по datasheet ANNA-B402 |
 | I2C LIS2DH12 | 2 × 10 кОм | 0402 | C25744 | |
@@ -140,7 +140,7 @@ TP4054 (datasheet TOPPOWER): утечка из аккумулятора при �
 
 - **CPT-9019A — был выбран в D-25, заменён D-27, запасной**: самое маленькое посадочное место (10 × 9 мм), 0,2 г, есть на складе LCSC (243 шт. на 2026-11-10). На 4 кГц тише CPT-1117-83 примерно на 9 дБ, на своей лучшей частоте (~6 кГц, узкий пик) — на 2–4 дБ.
 - **CPT-12123-81** — был запасным для CPT-1117-83: типичные 81 дБ при 5 В, предел 25 В полностью покрывает размах PAM8904E, самый широкий диапазон температур (до −40 °C, важно зимой), понятный datasheet. Минус — самый тяжёлый (0,5 г) и самый дорогой.
-- **CPT-1117-83 — выбран (D-20, затем D-27)**. По паспорту лучший по сумме параметров: громче всех кандидатов Same Sky широкой полосой 3–8 кГц, 0,2 г, 1,7 мм высоты. С лепестками излучатель 15 мм длиной: встаёт под модулем на плате 16 мм шириной (D-27). Минус — на LCSC почти нет, только через Global Sourcing у Arrow. Сборка у нас и так Standard с Global Sourcing, поэтому это вторая позиция из Global Sourcing, а не смена тарифа.
+- **CPT-1117-83 — выбран (D-20, затем D-27)**. По паспорту лучший по сумме параметров: громче всех кандидатов Same Sky широкой полосой 3–8 кГц, 0,2 г, 1,7 мм высоты. С лепестками излучатель 15 мм длиной: встаёт под модулем на плате 17 мм шириной (D-27, D-28). Минус — на LCSC почти нет, только через Global Sourcing у Arrow. Сборка у нас и так Standard с Global Sourcing, поэтому это вторая позиция из Global Sourcing, а не смена тарифа.
 - **KLJ-1230** — на бумаге самый громкий и дешёвый, много на складе. Но предел 20 В размаха меньше, чем даёт PAM8904E на полном аккумуляторе (до 25 В), и рабочая температура только от −20 °C. Подходит при ограничении режима драйвера до 2x или после проверки на морозе.
 - **GSC1230YB** — интересен боковым выходом звука (удобно под термоусадкой), но тише и работает только до −20 °C.
 - FUET-1325 и FUET-1109 заметно тише, Murata снят с производства, CPT-9019A тише CPT-1117-83 (см. выше), зато занимает на плате 10 × 9 мм вместо 15,5 × 9.
@@ -202,6 +202,6 @@ TP4054 (datasheet TOPPOWER): утечка из аккумулятора при �
 - [Datasheet BL54L15µ v0.6](https://docs.rs-online.com/5913/A700000013862904.pdf), [страница 453-00223C с наличием](https://www.ezurio.com/part/453-00223c), [Ezurio BL54L15µ](https://ezurio.com/wireless-modules/bluetooth-modules/bl54-series/bl54l15-micro-series-bluetooth-le-802-15-4-nfc), [Octopart 453-00223](https://octopart.com/search?q=453-00223)
 - [Raytac AN54LV-15](https://www.raytac.com/product/ins.php?index_id=169), [Octopart AN54LV-15](https://octopart.com/search?q=AN54LV-15), [DigiKey AN54LV-15](https://www.digikey.com/en/products/detail/raytac/AN54LV-15/27793700)
 - [HJ-N54L-SIP](https://www.digikey.com/en/products/detail/hjsip/HJ-N54L-SIP/28732673), [Fanstel BM15](https://fanstel.squarespace.com/bm15-nrf54l15-modules), [Ebyte E73-2G4M54LP](https://www.es-ebyte.com/products/E73-2G4M54LP(15)/7)
-- LCSC: [TP4054 C32574](https://www.lcsc.com/product-detail/C32574.html), [TPS7A0233PDBVR C2887324](https://www.lcsc.com/product-detail/C2887324.html), [PAM8904EGPR C510550](https://www.lcsc.com/product-detail/C510550.html), [CPT-12123-81-SMT-TR C3812179](https://www.lcsc.com/product-detail/C3812179.html), [LIS2DH12TR C110926](https://www.lcsc.com/product-detail/C110926.html), [KT-0603W C2290](https://www.lcsc.com/product-detail/C2290.html), [2N7002 C8545](https://www.lcsc.com/product-detail/C8545.html), [TS-1088-AR02016 C720477](https://www.lcsc.com/product-detail/C720477.html), [SM04B-SRSS-TB C160404](https://www.lcsc.com/product-detail/C160404.html), [SM02B-SRSS-TB C160402](https://www.lcsc.com/product-detail/C160402.html)
+- LCSC: [TP4054 C32574](https://www.lcsc.com/product-detail/C32574.html), [TPS7A0233PDBVR C2887324](https://www.lcsc.com/product-detail/C2887324.html), [PAM8904EGPR C510550](https://www.lcsc.com/product-detail/C510550.html), [CPT-12123-81-SMT-TR C3812179](https://www.lcsc.com/product-detail/C3812179.html), [LIS2DH12TR C110926](https://www.lcsc.com/product-detail/C110926.html), [KT-0603W C2290](https://www.lcsc.com/product-detail/C2290.html), [2N7002 C8545](https://www.lcsc.com/product-detail/C8545.html), [TS-1088-AR02016 C720477](https://www.lcsc.com/product-detail/C720477.html)
 - Бипер: [Octopart CPT-12123-81-SMT-TR](https://octopart.com/search?q=CPT-12123-81-SMT-TR), [Octopart CPT-1117-83-SMT-TR](https://octopart.com/search?q=CPT-1117-83-SMT-TR), [datasheet CPT-9019A-SMT-TR](https://www.sameskydevices.com/product/resource/cpt-9019a-smt-tr.pdf), [LCSC KLJ-1230](https://www.lcsc.com/product-detail/C201042.html), [LCSC FUET-1325](https://www.lcsc.com/product-detail/C391038.html), [LCSC CPT-9019A](https://www.lcsc.com/product-detail/C20181991.html), [Murata EOL](https://octopart.com/part/murata/PKLCS1212E40A1-R1)
 - [Oscar Liang, сравнение буззеров](https://oscarliang.com/drone-buzzers-with-battery), [Flywoo Finder V1.0](https://www.getfpv.com/drone-brands/flywoo/flywoo-finder-v1-0-w-led-buzzer.html)

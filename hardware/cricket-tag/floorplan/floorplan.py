@@ -2,9 +2,9 @@
 
 Не разводка, а проверка площади: детали ставятся по курятникам, DRC ищет
 перекрытия (courtyards_overlap). Варианты и картинки — в README платы,
-раздел «Размер платы»; текущий — w16b (D-27).
+раздел «Размер платы»; текущий — w17d (D-28).
 
-python3 floorplan.py w16b /tmp/fp.kicad_pcb    # w14, w14s, w16b, w18s
+python3 floorplan.py w17d /tmp/fp.kicad_pcb    # w14, w14s, w16b, w17b, w17c, w17d, w18s
 cp cricket-tag.kicad_pro /tmp/fp.kicad_pro; cp fp-lib-table /tmp/
 kicad-cli pcb drc /tmp/fp.kicad_pcb -o /tmp/fp.rpt
 Координаты платы: X поперёк (0..W), Y вдоль (0..L), антенна у Y=0.
