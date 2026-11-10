@@ -16,13 +16,13 @@ CLI для проверок без GUI (`kicad-cli` слинкован Homebrew 
 ```bash
 KICAD_CLI=kicad-cli
 $KICAD_CLI sch erc  hardware/cricket-tag/cricket-tag.kicad_sch -o /tmp/erc.rpt
-$KICAD_CLI pcb drc  hardware/cricket-tag/cricket-tag.kicad_pcb -o /tmp/drc.rpt
-$KICAD_CLI pcb export gerbers hardware/cricket-tag/cricket-tag.kicad_pcb -o hardware/cricket-tag/fab/gerbers/
-$KICAD_CLI pcb export drill   hardware/cricket-tag/cricket-tag.kicad_pcb -o hardware/cricket-tag/fab/gerbers/
-$KICAD_CLI pcb export pos     hardware/cricket-tag/cricket-tag.kicad_pcb -o hardware/cricket-tag/fab/cpl.csv --format csv --units mm --side front
-$KICAD_CLI sch export bom     hardware/cricket-tag/cricket-tag.kicad_sch -o hardware/cricket-tag/fab/bom.csv \
-  --fields "Value,Reference,Footprint,LCSC Part" --labels "Comment,Designator,Footprint,LCSC Part #" \
-  --group-by "Value,Footprint,LCSC Part" --ref-range-delimiter "" --exclude-dnp
+$KICAD_CLI pcb drc  --schematic-parity hardware/cricket-tag/cricket-tag.kicad_pcb -o /tmp/drc.rpt
+```
+
+Выходные файлы для JLCPCB (gerber-zip, `bom.csv`, `cpl.csv` в `hardware/cricket-tag/fab/`) делает один скрипт. Внутри — те же `kicad-cli pcb export gerbers/drill/pos` и `sch export bom`, плюс перевод в формат JLCPCB, поправки поворота по номеру LCSC и ASCII в BOM ([manufacturing.md](manufacturing.md#выходные-файлы)):
+
+```bash
+hardware/cricket-tag/make_fab.sh
 ```
 
 Разводка платы — Freerouting 2.5 (`freerouting-2.5.0.jar` из релизов github.com/freerouting/freerouting) под OpenJDK 27 из Homebrew (`brew install openjdk`, keg-only: вызывается как `/opt/homebrew/opt/openjdk/bin/java`, системная Java не меняется). Запуск — `hardware/cricket-tag/route.sh`, см. README платы.
