@@ -18,3 +18,17 @@
 		sim-impact = &button3;
 	};
 };
+
+/* Buttons wait on GPIO SENSE, not GPIOTE event channels (lower idle current) */
+&gpio0 {
+	sense-edge-mask = <(BIT(4))>;
+};
+
+&gpio1 {
+	sense-edge-mask = <(BIT(8) | BIT(9) | BIT(13))>;
+};
+
+/* Watchdog (src/wdog.c); disabled in the DK devicetree */
+&wdt31 {
+	status = "okay";
+};

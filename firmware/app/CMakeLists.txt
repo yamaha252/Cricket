@@ -15,6 +15,7 @@ target_sources(app PRIVATE
   src/modes.c
   src/dfu.c
   src/pair.c
+  src/wdog.c
 )
 target_sources_ifdef(CONFIG_CRICKET_MSP app PRIVATE src/msp.c)
 target_sources_ifdef(CONFIG_CRICKET_IMPACT app PRIVATE src/impact.c)

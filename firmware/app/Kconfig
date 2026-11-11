@@ -50,4 +50,8 @@ config CRICKET_RSSI_1M
 
 endmenu
 
+# The cricket-tag board has no debug UART: log over RTT (release.conf turns it off).
+config USE_SEGGER_RTT
+	default y if BOARD_CRICKET_TAG
+
 source "Kconfig.zephyr"

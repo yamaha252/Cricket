@@ -7,6 +7,7 @@
 #include "modes.h"
 #include "pair.h"
 #include "status.h"
+#include "wdog.h"
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/kernel.h>
@@ -21,6 +22,11 @@ int main(void)
 
 	status_init();
 	LOG_INF("Cricket tag, id %08x", status_id());
+
+	err = wdog_init();
+	if (err) {
+		LOG_WRN("watchdog init failed (%d)", err);
+	}
 
 	err = battery_init();
 	if (err) {

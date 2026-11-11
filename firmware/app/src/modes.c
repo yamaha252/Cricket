@@ -20,6 +20,7 @@
 #include "msp.h"
 #include "pair.h"
 #include "status.h"
+#include "wdog.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -104,6 +105,7 @@ static void enter(enum cricket_mode m)
 
 static void poweroff_fn(struct k_work *w)
 {
+	wdog_stop();
 	buzzer_play(BUZZ_OFF, 0);
 	inputs_prepare_wakeup();
 	LOG_INF("System OFF");
@@ -268,6 +270,8 @@ static void tick_fn(struct k_work *w)
 	int64_t now = k_uptime_get();
 	int64_t in_mode = now - mode_since;
 	k_timeout_t next = K_SECONDS(10);
+
+	wdog_feed();
 
 	{
 		bool charging = inputs_charging();

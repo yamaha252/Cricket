@@ -127,12 +127,19 @@
 	status = "okay";
 };
 
+/*
+ * Edge interrupts through the GPIO SENSE mechanism instead of GPIOTE event
+ * channels, which cost current while waiting: VIN_SENSE (P0.03), button
+ * (P1.05), LIS2DH12 INT1 (P1.11).
+ */
 &gpio0 {
 	status = "okay";
+	sense-edge-mask = <(BIT(3))>;
 };
 
 &gpio1 {
 	status = "okay";
+	sense-edge-mask = <(BIT(5) | BIT(11))>;
 };
 
 &gpio2 {
