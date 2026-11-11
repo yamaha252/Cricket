@@ -17,3 +17,7 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Private signing keys never go into the repository (firmware/README.md)
+*.pem
+!*.pub.pem

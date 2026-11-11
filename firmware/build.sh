@@ -18,5 +18,13 @@ CMAKE_ARGS=""
 for a in "$@"; do
   CMAKE_ARGS="$CMAKE_ARGS '$a'"
 done
+# MCUboot signing key: private, kept outside the repository (firmware/README.md,
+# «Обновление прошивки»). Without it the SDK's public development key is used.
+KEY=${CRICKET_MCUBOOT_KEY:-$HOME/.cricket/keys/mcuboot-ed25519.pem}
+if [ -f "$KEY" ]; then
+  CMAKE_ARGS="$CMAKE_ARGS '-DSB_CONFIG_BOOT_SIGNATURE_KEY_FILE=\"$KEY\"'"
+else
+  echo "build.sh: $KEY not found, signing with the SDK development key" >&2
+fi
 exec nrfutil sdk-manager toolchain launch --ncs-version "$NCS" -- sh -c \
   "cd /opt/nordic/ncs/$NCS && . zephyr/zephyr-env.sh && cd '$ROOT' && west build -b '$BOARD' --sysbuild firmware/app -d firmware/build $WEST_ARGS -- -DBOARD_ROOT='$ROOT/firmware' $CMAKE_ARGS"
