@@ -113,7 +113,7 @@ static void sim_armed_changed(struct button *b)
 	if (b->pressed) {
 		sim_armed = !sim_armed;
 		LOG_INF("sim: MSP %s", sim_armed ? "armed" : "disarmed");
-		modes_post(sim_armed ? EV_ARMED : EV_DISARMED, 0);
+		modes_post(EV_MSP, sim_armed ? MSP_ARMED : 0);
 	}
 }
 

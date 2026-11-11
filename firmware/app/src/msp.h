@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 /*
- * MSP v1 client to the flight controller (Betaflight, INAV): armed state from
- * MSP_STATUS and the GPS fix from MSP_RAW_GPS. The FC must run MSP on the UART
+ * MSP v1 client to the flight controller (Betaflight, INAV): armed, BEEPER and
+ * FAILSAFE modes and link loss from MSP_STATUS, the GPS fix and ground speed
+ * from MSP_RAW_GPS; posted to modes.c as EV_MSP. The FC must run MSP on the UART
  * wired to the tag, 115200 baud.
  */
 #pragma once
