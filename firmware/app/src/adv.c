@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "adv.h"
+#include "config.h"
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
@@ -7,12 +8,11 @@
 #include <zephyr/bluetooth/hci_vs.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
+#include <string.h>
 
 LOG_MODULE_REGISTER(adv, LOG_LEVEL_INF);
 
-#define TX_POWER_DBM 8
-
-enum { SET_CODED, SET_1M, SET_COUNT };
+enum { SET_CODED = CFG_SET_CODED, SET_1M = CFG_SET_1M, SET_COUNT = CFG_SET_COUNT };
 
 struct adv_set {
 	const char *name;
@@ -41,20 +41,22 @@ static struct bt_data ad[] = {
 	BT_DATA(BT_DATA_MANUFACTURER_DATA, &payload, sizeof(payload)),
 };
 
-static const struct bt_data sd[] = {
-	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
-};
+static struct bt_data sd[1]; /* device name, set from the app (config.c) */
 
-/* Interval table per mode, milliseconds: {coded, 1m}; docs/protocol.md */
-static const uint16_t intervals_ms[][SET_COUNT] = {
-	[MODE_ON_DRONE] = {1000, 1000},
-	[MODE_ESCALATE] = {1000, 2000},
-	[MODE_ALARM] = {1000, 2000},
-	[MODE_BEACON] = {2000, 4000},
-	[MODE_STANDBY] = {5000, 5000},
-	[MODE_LOW_BAT] = {10000, 10000},
-	[MODE_SHIP] = {0, 0},
-};
+static enum cricket_mode cur_mode = MODE_STANDBY;
+static bool cur_armed;
+
+/* Interval for the set in the mode, ms; 0: off. Intervals per mode come from config.c. */
+static uint16_t interval_for(int set, enum cricket_mode mode, bool armed)
+{
+	struct cricket_cfg c;
+
+	if (mode >= CFG_MODES || (mode == MODE_ON_DRONE && armed)) {
+		return 0;
+	}
+	config_get(&c);
+	return c.interval_ms[mode][set];
+}
 
 static struct bt_le_adv_param param_for(const struct adv_set *s, uint16_t ms)
 {
@@ -103,6 +105,9 @@ static void set_data(struct adv_set *s)
 	int err;
 
 	if (s == &sets[SET_1M]) {
+		const char *name = bt_get_name();
+
+		sd[0] = (struct bt_data)BT_DATA(BT_DATA_NAME_COMPLETE, name, strlen(name));
 		err = bt_le_ext_adv_set_data(s->adv, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 	} else {
 		err = bt_le_ext_adv_set_data(s->adv, ad, ARRAY_SIZE(ad), NULL, 0);
@@ -139,20 +144,22 @@ BT_CONN_CB_DEFINE(adv_conn_cb) = {
 
 int adv_init(void)
 {
+	struct cricket_cfg c;
 	int err;
 
+	config_get(&c);
 	status_build(&payload);
 
 	for (int i = 0; i < SET_COUNT; i++) {
 		struct adv_set *s = &sets[i];
-		struct bt_le_adv_param p = param_for(s, intervals_ms[MODE_STANDBY][i]);
+		struct bt_le_adv_param p = param_for(s, 1000);
 
 		err = bt_le_ext_adv_create(&p, NULL, &s->adv);
 		if (err) {
 			LOG_ERR("%s: create failed (%d)", s->name, err);
 			return err;
 		}
-		set_tx_power(s, TX_POWER_DBM);
+		set_tx_power(s, c.tx_dbm[i]);
 		set_data(s);
 	}
 	return 0;
@@ -160,9 +167,12 @@ int adv_init(void)
 
 void adv_apply(enum cricket_mode mode, bool armed)
 {
+	cur_mode = mode;
+	cur_armed = armed;
+
 	for (int i = 0; i < SET_COUNT; i++) {
 		struct adv_set *s = &sets[i];
-		uint16_t ms = (mode == MODE_ON_DRONE && armed) ? 0 : intervals_ms[mode][i];
+		uint16_t ms = interval_for(i, mode, armed);
 		struct bt_le_adv_param p;
 		int err;
 
@@ -193,10 +203,31 @@ void adv_refresh(void)
 	}
 }
 
+void adv_reload(void)
+{
+	struct cricket_cfg c;
+
+	if (cur_mode == MODE_SHIP) {
+		return;
+	}
+	config_get(&c);
+	status_build(&payload);
+	for (int i = 0; i < SET_COUNT; i++) {
+		struct adv_set *s = &sets[i];
+
+		bt_le_ext_adv_stop(s->adv);
+		s->interval_ms = UINT16_MAX; /* forces adv_apply to restart the set */
+		set_tx_power(s, c.tx_dbm[i]);
+		set_data(s);
+	}
+	adv_apply(cur_mode, cur_armed);
+}
+
 void adv_stop_all(void)
 {
 	for (int i = 0; i < SET_COUNT; i++) {
 		bt_le_ext_adv_stop(sets[i].adv);
 		sets[i].interval_ms = 0;
 	}
+	cur_mode = MODE_SHIP;
 }

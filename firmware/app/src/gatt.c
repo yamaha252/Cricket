@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "gatt.h"
+#include "config.h"
 #include "modes.h"
 #include "pair.h"
 #include "status.h"
@@ -17,6 +18,7 @@ LOG_MODULE_REGISTER(gatt, LOG_LEVEL_INF);
 static const struct bt_uuid_128 svc_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x00));
 static const struct bt_uuid_128 status_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x01));
 static const struct bt_uuid_128 control_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x02));
+static const struct bt_uuid_128 settings_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x03));
 
 #define STATUS_OFFSET offsetof(struct cricket_payload, version) /* skip Company ID */
 
@@ -88,9 +90,37 @@ static ssize_t write_control(struct bt_conn *conn, const struct bt_gatt_attr *at
 	case CRICKET_CMD_FORGET:
 		pair_forget_others(bt_conn_get_dst(conn));
 		break;
+	case CRICKET_CMD_DEFAULTS:
+		config_reset();
+		break;
 	default:
 		LOG_WRN("unknown command 0x%02x", cmd[0]);
 		return BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
+	}
+	return len;
+}
+
+static ssize_t read_settings(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
+			     uint16_t len, uint16_t offset)
+{
+	uint8_t v[96];
+	size_t n = config_encode(v, sizeof(v));
+
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, v, n);
+}
+
+static ssize_t write_settings(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+			      const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
+{
+	uint8_t err;
+
+	if (offset) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+	}
+	err = config_write(buf, len);
+	if (err) {
+		LOG_WRN("settings rejected (0x%02x)", err);
+		return BT_GATT_ERR(err);
 	}
 	return len;
 }
@@ -103,6 +133,10 @@ BT_GATT_SERVICE_DEFINE(cricket_svc,
 	/* Encryption is checked per command in write_control */
 	BT_GATT_CHARACTERISTIC(&control_uuid.uuid, BT_GATT_CHRC_WRITE,
 			       BT_GATT_PERM_WRITE, NULL, write_control, NULL),
+	/* Bluetooth settings (config.c): only over a bonded link */
+	BT_GATT_CHARACTERISTIC(&settings_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+			       BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT,
+			       read_settings, write_settings, NULL),
 );
 
 void gatt_notify_status(void)

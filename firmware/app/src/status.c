@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "status.h"
+#include "config.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/hwinfo.h>
@@ -66,6 +67,8 @@ void status_set_position(int32_t lat, int32_t lon)
 
 void status_build(struct cricket_payload *out)
 {
+	int8_t rssi_1m = config_rssi_1m();
+
 	K_SPINLOCK(&lock) {
 		int64_t minutes = (k_uptime_get() - mode_since_ms) / 60000;
 
@@ -75,7 +78,7 @@ void status_build(struct cricket_payload *out)
 		out->mode = mode;
 		out->flags = flags;
 		out->battery_mv = sys_cpu_to_le16(battery_mv);
-		out->rssi_1m = CONFIG_CRICKET_RSSI_1M;
+		out->rssi_1m = rssi_1m;
 		out->mode_minutes = sys_cpu_to_le16(MIN(minutes, UINT16_MAX));
 		out->lat_e7 = sys_cpu_to_le32(lat_e7);
 		out->lon_e7 = sys_cpu_to_le32(lon_e7);

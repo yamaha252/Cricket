@@ -10,4 +10,6 @@ int adv_init(void);
 void adv_apply(enum cricket_mode mode, bool armed);
 /* Push current status into both sets' advertising data. */
 void adv_refresh(void);
+/* Re-read config.c settings (TX power, name, intervals) and restart the sets. */
+void adv_reload(void);
 void adv_stop_all(void);

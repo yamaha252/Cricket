@@ -47,6 +47,8 @@ config CRICKET_RSSI_1M
 	int "Calibrated RSSI at 1 m, dBm"
 	default -59
 	range -128 0
+	help
+	  Default only: the app can change it (src/config.c).
 
 endmenu
 
