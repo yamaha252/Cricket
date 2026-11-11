@@ -10,14 +10,30 @@ class PositionService extends ChangeNotifier {
   String? error;
   StreamSubscription<Position>? _sub;
 
-  Future<void> start() async {
-    if (_sub != null) return;
+  bool _starting = false;
+
+  /// With [request] false the permission dialog is not shown (used on
+  /// resume, to pick up a permission granted in the system settings).
+  Future<void> start({bool request = true}) async {
+    if (_sub != null || _starting) return;
+    _starting = true;
+    try {
+      await _start(request);
+    } catch (e) {
+      error = '$e';
+      notifyListeners();
+    } finally {
+      _starting = false;
+    }
+  }
+
+  Future<void> _start(bool request) async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       error = 'Геолокация выключена';
       notifyListeners();
     }
     var p = await Geolocator.checkPermission();
-    if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
+    if (p == LocationPermission.denied && request) p = await Geolocator.requestPermission();
     if (p == LocationPermission.denied || p == LocationPermission.deniedForever) {
       error = 'Нет разрешения на геолокацию';
       notifyListeners();

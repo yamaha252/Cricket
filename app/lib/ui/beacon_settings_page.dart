@@ -31,6 +31,12 @@ class _BeaconSettingsPageState extends State<BeaconSettingsPage> {
   @override
   void dispose() {
     Ble.instance.disconnect();
+    _name.dispose();
+    _contact.dispose();
+    for (final (c, o) in _iv.values) {
+      c.dispose();
+      o.dispose();
+    }
     super.dispose();
   }
 
@@ -39,20 +45,24 @@ class _BeaconSettingsPageState extends State<BeaconSettingsPage> {
     try {
       await Ble.instance.connect(widget.address);
       final s = BeaconSettings.decode(await Ble.instance.read(settingsUuid));
+      if (!mounted) return;
       _name.text = s.name;
       _contact.text = s.contact;
       for (final m in intervalModes) {
         final v = s.intervals[m];
-        _iv[m] = (
-          TextEditingController(text: '${v?.codedMs ?? ''}'),
-          TextEditingController(text: '${v?.oneMMs ?? ''}'),
-        );
+        final (c, o) = _iv[m] ??= (TextEditingController(), TextEditingController());
+        c.text = '${v?.codedMs ?? ''}';
+        o.text = '${v?.oneMMs ?? ''}';
       }
       setState(() => _s = s);
     } on BleException catch (e) {
-      setState(() => _error = e.message.contains('Чтение')
+      if (!mounted) return;
+      // 5, 8, 15: insufficient authentication, authorization, encryption.
+      setState(() => _error = const [5, 8, 15].contains(e.status)
           ? 'Нет доступа: телефон не привязан к маячку'
           : e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
     }
   }
 
@@ -62,8 +72,15 @@ class _BeaconSettingsPageState extends State<BeaconSettingsPage> {
     s.contact = _contact.text.trim();
     for (final m in intervalModes) {
       final (c, o) = _iv[m]!;
-      final cv = int.tryParse(c.text), ov = int.tryParse(o.text);
-      if (cv != null && ov != null) s.intervals[m] = Intervals(cv, ov);
+      final ct = c.text.trim(), ot = o.text.trim();
+      if (ct.isEmpty && ot.isEmpty && s.intervals[m] == null) continue;
+      final cv = int.tryParse(ct), ov = int.tryParse(ot);
+      if (cv == null || ov == null) {
+        // Do not report "saved" while silently keeping the old value.
+        showSnack(context, '${m.label}: интервалы должны быть целыми числами, мс');
+        return;
+      }
+      s.intervals[m] = Intervals(cv, ov);
     }
     final err = s.validate();
     if (err != null) {
@@ -74,7 +91,7 @@ class _BeaconSettingsPageState extends State<BeaconSettingsPage> {
     try {
       final st = await Ble.instance.write(settingsUuid, s.encode());
       if (mounted) showSnack(context, st == 0 ? 'Сохранено' : 'Не сохранено: ${gattStatusText(st)}');
-    } on BleException catch (e) {
+    } catch (e) {
       if (mounted) showSnack(context, '$e');
     } finally {
       if (mounted) setState(() => _saving = false);

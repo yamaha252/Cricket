@@ -67,8 +67,13 @@ class _OfflineMapsPageState extends State<OfflineMapsPage> {
     await job.run();
     await _refreshSizes();
     if (mounted) {
-      showSnack(context,
-          job.cancelled ? 'Загрузка остановлена' : 'Готово: ${job.done - job.failed} тайлов, ошибок ${job.failed}');
+      showSnack(
+          context,
+          job.aborted
+              ? 'Загрузка прервана: нет сети или сервер не отвечает'
+              : job.cancelled
+                  ? 'Загрузка остановлена'
+                  : 'Готово: ${job.done - job.failed} тайлов, ошибок ${job.failed}');
     }
   }
 
@@ -81,8 +86,24 @@ class _OfflineMapsPageState extends State<OfflineMapsPage> {
       if (mounted) showSnack(context, 'Добавлена карта «${s.name}»');
     } catch (e) {
       if (mounted) showSnack(context, 'Не удалось открыть: $e');
+    } finally {
+      // The picker leaves its own copy of the (large) file in the cache.
+      FilePicker.clearTemporaryFiles().catchError((_) {});
     }
   }
+
+  Future<bool> _confirm(String text) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          content: Text(text),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Удалить')),
+          ],
+        ),
+      ) ??
+      false;
 
   @override
   Widget build(BuildContext context) {
@@ -154,6 +175,11 @@ class _OfflineMapsPageState extends State<OfflineMapsPage> {
                     tooltip: s.isMbtiles ? 'Удалить файл' : 'Очистить кэш',
                     icon: const Icon(Icons.delete_outline),
                     onPressed: () async {
+                      if (!await _confirm(s.isMbtiles
+                          ? 'Удалить карту «${s.name}» из приложения?'
+                          : 'Удалить сохранённые тайлы «${s.name}»? Без сети карта этих мест не откроется.')) {
+                        return;
+                      }
                       if (s.isMbtiles) {
                         if (map.source.id == s.id) await map.setSource(openTopoMap);
                         await TileStore.instance.removeMbtiles(s);

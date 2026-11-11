@@ -65,18 +65,23 @@ class BeaconStore extends ChangeNotifier {
   int oneMTotal = 0;
 
   StreamSubscription? _scanSub, _connSub;
-  Timer? _notifyTimer;
+  Timer? _notifyTimer, _rescanTimer;
   bool _dirty = false;
+  int _ticks = 0;
+  Future<void>? _starting;
 
   static const _prefsMine = 'mine_beacons';
 
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
     final s = p.getString(_prefsMine);
-    if (s != null) {
+    if (s == null) return;
+    try {
       (jsonDecode(s) as Map).forEach((k, v) => mine[int.parse(k as String)] = v as String);
-      notifyListeners();
+    } catch (e) {
+      debugPrint('Own beacon list is damaged: $e');
     }
+    notifyListeners();
   }
 
   Future<void> _saveMine() async {
@@ -106,8 +111,27 @@ class BeaconStore extends ChangeNotifier {
     return l;
   }
 
-  Future<void> start() async {
-    if (!await _permissions()) {
+  /// Starts scanning. With [request] false the permission dialog is not
+  /// shown: used on resume, where asking again right after a refusal would
+  /// put the dialog up twice in a row.
+  Future<void> start({bool request = true}) {
+    // Calls overlap (startup, resume, adapter events): run one at a time.
+    final prev = _starting;
+    late final Future<void> f;
+    f = () async {
+      if (prev != null) await prev;
+      try {
+        await _start(request);
+      } finally {
+        if (identical(_starting, f)) _starting = null;
+      }
+    }();
+    return _starting = f;
+  }
+
+  Future<void> _start(bool request) async {
+    if (state == ScanState.scanning) return;
+    if (!await _permissions(request)) {
       state = ScanState.noPermission;
       notifyListeners();
       return;
@@ -130,13 +154,18 @@ class BeaconStore extends ChangeNotifier {
         error = '$e';
         notifyListeners();
       });
-      final ok = await Ble.instance.startScan();
-      state = ok ? ScanState.scanning : ScanState.failed;
+      try {
+        state = await Ble.instance.startScan() ? ScanState.scanning : ScanState.failed;
+        error = null;
+      } catch (e) {
+        state = ScanState.failed;
+        error = '$e';
+      }
     }
     _connSub ??= Ble.instance.connStream.listen((e) {
       if (e['event'] == 'adapter') {
         if (e['enabled'] == true) {
-          start();
+          start(request: false);
         } else {
           state = ScanState.bluetoothOff;
           notifyListeners();
@@ -144,8 +173,26 @@ class BeaconStore extends ChangeNotifier {
       }
     });
     _notifyTimer ??= Timer.periodic(const Duration(milliseconds: 300), (_) {
-      if (_dirty) {
+      // Without packets the screen still has to age: "no signal", "seen N s
+      // ago" and the signal bars depend on the clock.
+      final age = ++_ticks % 4 == 0 && beacons.isNotEmpty;
+      if (_dirty || age) {
         _dirty = false;
+        notifyListeners();
+      }
+    });
+    // Android quietly downgrades a scan that runs for 30 min; a long search
+    // would stop hearing the beacon, so the scan is restarted before that.
+    _rescanTimer ??= Timer.periodic(const Duration(minutes: 20), (_) async {
+      if (state != ScanState.scanning) return;
+      try {
+        if (!await Ble.instance.startScan()) {
+          state = ScanState.failed;
+          notifyListeners();
+        }
+      } catch (e) {
+        state = ScanState.failed;
+        error = '$e';
         notifyListeners();
       }
     });
@@ -160,9 +207,11 @@ class BeaconStore extends ChangeNotifier {
     }
   }
 
-  Future<bool> _permissions() async {
+  Future<bool> _permissions(bool request) async {
     try {
-      return await Ble.instance.requestPermissions();
+      return request
+          ? await Ble.instance.requestPermissions()
+          : await Ble.instance.hasPermissions();
     } catch (_) {
       return false; // no native layer (iOS not done yet)
     }
@@ -197,6 +246,7 @@ class BeaconStore extends ChangeNotifier {
     _scanSub?.cancel();
     _connSub?.cancel();
     _notifyTimer?.cancel();
+    _rescanTimer?.cancel();
     super.dispose();
   }
 }

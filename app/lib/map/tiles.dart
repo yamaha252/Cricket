@@ -105,6 +105,7 @@ class TileStore extends ChangeNotifier {
   final Map<String, Database> _dbs = {};
   final http.Client _client = http.Client();
   DateTime _offlineUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  int _tmpSeq = 0;
 
   List<TileSource> get sources => [...builtinSources, ...imported];
 
@@ -152,7 +153,11 @@ class TileStore extends ChangeNotifier {
       if (r.statusCode != 200 || r.bodyBytes.isEmpty) return null;
       final f = _file(s, z, x, y);
       await f.parent.create(recursive: true);
-      await f.writeAsBytes(r.bodyBytes, flush: false);
+      // Write aside and rename: a half-written tile (app killed, or read by
+      // the map while a download writes it) would stay broken forever.
+      final tmp = File('${f.path}.${_tmpSeq++}.tmp');
+      await tmp.writeAsBytes(r.bodyBytes, flush: false);
+      await tmp.rename(f.path);
       return r.bodyBytes;
     } on SocketException {
       // No network: stop trying for a while so offline panning stays fast.
@@ -225,17 +230,24 @@ class TileStore extends ChangeNotifier {
   Future<TileSource> importMbtiles(String srcPath) async {
     final name = srcPath.split('/').last;
     final dst = '${_mbDir.path}/${name.endsWith('.mbtiles') ? name : '$name.mbtiles'}';
-    await File(srcPath).copy(dst);
+    // Check the file before it replaces a map of the same name.
+    final tmp = '$dst.new';
+    await File(srcPath).copy(tmp);
     try {
-      final s = await _openMbtiles(dst);
-      imported.removeWhere((e) => e.id == s.id);
-      imported.add(s);
-      notifyListeners();
-      return s;
+      final probe = await _openMbtiles(tmp);
+      await _dbs.remove(probe.id)?.close();
     } catch (_) {
-      await File(dst).delete();
+      await File(tmp).delete();
       rethrow;
     }
+    final id = 'mb:${dst.split('/').last}';
+    await _dbs.remove(id)?.close();
+    imported.removeWhere((e) => e.id == id);
+    await File(tmp).rename(dst);
+    final s = await _openMbtiles(dst);
+    imported.add(s);
+    notifyListeners();
+    return s;
   }
 
   Future<void> removeMbtiles(TileSource s) async {
@@ -255,6 +267,12 @@ class AreaDownload extends ChangeNotifier {
   int done = 0, skipped = 0, failed = 0;
   bool running = false, cancelled = false;
 
+  /// Stopped by itself after [_maxFailuresInRow] failures in a row: no
+  /// network or the server refuses, going on would only hammer it.
+  bool aborted = false;
+  int _failuresInRow = 0;
+  static const _maxFailuresInRow = 20;
+
   int get total => ranges.fold(0, (a, r) => a + r.count);
 
   Future<void> run({int parallel = 2}) async {
@@ -272,6 +290,9 @@ class AreaDownload extends ChangeNotifier {
           skipped++;
         } else if (await store._fetch(source, z, x, y) == null) {
           failed++;
+          if (++_failuresInRow >= _maxFailuresInRow) aborted = cancelled = true;
+        } else {
+          _failuresInRow = 0;
         }
         done++;
         if (done % 10 == 0) notifyListeners();

@@ -143,7 +143,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final s = Services.of(context);
     if (state == AppLifecycleState.resumed) {
-      s.beacons.start();
+      // No permission dialogs here: a refusal resumes the app and would
+      // bring the dialog straight back. The banner button asks again.
+      s.beacons.start(request: false);
+      s.position.start(request: false);
     } else if (state == AppLifecycleState.paused && !s.locator.recording) {
       // Keep scanning in the background only while a track is being recorded.
       s.beacons.stop();

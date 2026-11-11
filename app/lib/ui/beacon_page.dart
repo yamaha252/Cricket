@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../app.dart';
@@ -72,6 +72,10 @@ class _BeaconPageState extends State<BeaconPage> {
             .then((_) => _connected = null);
       }
       await action();
+    } on TimeoutException {
+      if (mounted) showSnack(context, 'Маячок не ответил вовремя');
+    } on PlatformException catch (e) {
+      if (mounted) showSnack(context, e.message ?? e.code);
     } on BleException catch (e) {
       _connected = null;
       if (mounted) showSnack(context, '$e');
@@ -94,6 +98,7 @@ class _BeaconPageState extends State<BeaconPage> {
 
   Future<void> _readContact() => _withLink(() async {
         final v = await Ble.instance.read(ownerUuid);
+        if (!mounted) return;
         setState(() => _contact = v.isEmpty ? '' : utf8.decode(v, allowMalformed: true));
       });
 
@@ -107,13 +112,18 @@ class _BeaconPageState extends State<BeaconPage> {
             .where((e) => e['event'] == 'bond' && e['address'] == r.address)
             .firstWhere((e) => e['bond'] != 'bonding')
             .timeout(const Duration(seconds: 40));
-        await Ble.instance.createBond(r.address);
+        bonded.ignore(); // errors are handled by the await below
+        if (!await Ble.instance.createBond(r.address)) {
+          throw BleException('Телефон не начал привязку');
+        }
         final e = await bonded;
         if (e['bond'] != 'bonded') throw BleException('Привязка отклонена: окно привязки закрыто?');
       }
       if (!mounted) return;
       final label = await _askLabel(store.labelOf(widget.id));
-      store.setMine(widget.id, label ?? store.labelOf(widget.id));
+      // Cancelled or left empty: keep the current name, never a blank one.
+      store.setMine(
+          widget.id, label == null || label.isEmpty ? store.labelOf(widget.id) : label);
       if (mounted) showSnack(context, 'Маячок привязан');
     });
   }

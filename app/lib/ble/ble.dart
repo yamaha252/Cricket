@@ -57,8 +57,11 @@ class AdapterInfo {
 }
 
 class BleException implements Exception {
-  BleException(this.message);
+  BleException(this.message, {this.status});
   final String message;
+
+  /// GATT status when the beacon answered with an error.
+  final int? status;
   @override
   String toString() => message;
 }
@@ -94,6 +97,7 @@ class Ble {
 
   Future<AdapterInfo> adapterInfo() async =>
       AdapterInfo(await _m.invokeMethod<Map>('adapterInfo') ?? {});
+  Future<bool> hasPermissions() async => await _m.invokeMethod<bool>('hasPermissions') ?? false;
   Future<bool> requestPermissions() async =>
       await _m.invokeMethod<bool>('requestPermissions') ?? false;
   Future<void> openAppSettings() => _m.invokeMethod('openAppSettings');
@@ -101,32 +105,51 @@ class Ble {
   Future<bool> startScan({bool filtered = true}) async =>
       await _m.invokeMethod<bool>('startScan', {'filtered': filtered}) ?? false;
   Future<void> stopScan() => _m.invokeMethod('stopScan');
-  Future<void> keepScreenOn(bool on) => _m.invokeMethod('keepScreenOn', {'on': on});
-  Future<void> beep([int ms = 60]) => _m.invokeMethod('beep', {'ms': ms});
+  // Fire-and-forget conveniences: a failure here must not surface as an
+  // unhandled error (no native layer, ToneGenerator refused).
+  Future<void> keepScreenOn(bool on) =>
+      _m.invokeMethod('keepScreenOn', {'on': on}).catchError((_) {});
+  Future<void> beep([int ms = 60]) => _m.invokeMethod('beep', {'ms': ms}).catchError((_) {});
   Future<bool> createBond(String address) async =>
       await _m.invokeMethod<bool>('createBond', {'address': address}) ?? false;
   Future<String> bondState(String address) async =>
       await _m.invokeMethod<String>('bondState', {'address': address}) ?? 'none';
 
-  /// Connects and waits until services are discovered.
+  /// Connects and waits until services are discovered. Android often fails
+  /// the first attempt with status 133, so that one is retried once.
   Future<void> connect(String address, {Duration timeout = const Duration(seconds: 20)}) async {
-    final ready = connStream
-        .where((e) => e['event'] == 'state' && e['address'] == address)
-        .firstWhere((e) => e['state'] == 'ready' || e['state'] == 'disconnected');
-    await _m.invokeMethod('connect', {'address': address});
-    final e = await ready.timeout(timeout, onTimeout: () {
-      _m.invokeMethod('disconnect');
-      throw BleException('Маячок не отвечает');
-    });
-    if (e['state'] != 'ready') throw BleException('Соединение разорвано (${e['status']})');
+    for (var attempt = 0;; attempt++) {
+      final ready = connStream
+          .where((e) => e['event'] == 'state' && e['address'] == address)
+          .firstWhere((e) => e['state'] == 'ready' || e['state'] == 'disconnected')
+          .timeout(timeout);
+      ready.ignore(); // errors are handled by the await below
+      final Map e;
+      try {
+        await _m.invokeMethod('connect', {'address': address});
+        e = await ready;
+      } on PlatformException catch (err) {
+        throw BleException(err.message ?? err.code);
+      } on TimeoutException {
+        await disconnect();
+        throw BleException('Маячок не отвечает');
+      }
+      if (e['state'] == 'ready') {
+        if (e['status'] == 0) return;
+        await disconnect();
+        throw BleException('Сервисы маячка не прочитаны (${e['status']})');
+      }
+      if (e['status'] == 133 && attempt == 0) continue;
+      throw BleException('Соединение разорвано (${e['status']})');
+    }
   }
 
-  Future<void> disconnect() => _m.invokeMethod('disconnect');
+  Future<void> disconnect() => _m.invokeMethod('disconnect').catchError((_) {});
 
   Future<Uint8List> read(String uuid) => _serial(() async {
         final r = await _call<Map>('read', {'uuid': uuid});
         final status = r['status'] as int;
-        if (status != 0) throw BleException('Чтение: статус $status');
+        if (status != 0) throw BleException('Чтение: статус $status', status: status);
         return r['value'] as Uint8List;
       });
 
@@ -143,6 +166,9 @@ class Ble {
     } on PlatformException catch (e) {
       throw BleException(e.message ?? e.code);
     } on TimeoutException {
+      // The native side still holds the operation; dropping the link frees it,
+      // otherwise every later call would answer "busy".
+      await disconnect();
       throw BleException('Нет ответа от маячка');
     }
   }

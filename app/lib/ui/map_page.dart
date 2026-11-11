@@ -36,6 +36,14 @@ class _MapPageState extends State<MapPage> {
         _initial = LatLng(lat, lon);
         _initialZoom = p.getDouble('map_zoom') ?? 14;
       }
+      if (!mounted) return;
+      // A focus requested before the map was ready becomes its start view.
+      final f = _map?.focus;
+      if (f != null) {
+        _map!.focus = null;
+        _initial = f;
+        _initialZoom = 16;
+      }
       setState(() => _loaded = true);
     });
   }

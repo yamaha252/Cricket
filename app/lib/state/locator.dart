@@ -107,6 +107,13 @@ Estimate? estimate(List<Sample> samples, {double n = 2.2, double priorP0 = -59, 
   return Estimate(toLatLng(bx, by), radius, cells, p0s[best], samples.length);
 }
 
+/// The fit runs on the UI thread and costs grid² × samples, so a long walk
+/// (one sample a second) is thinned evenly to at most [max] samples.
+List<Sample> thin(List<Sample> samples, {int max = 600}) {
+  if (samples.length <= max) return samples;
+  return [for (var i = 0; i < max; i++) samples[i * samples.length ~/ max]];
+}
+
 /// Records samples for the selected beacon while it is heard and the phone
 /// has a GPS fix.
 class LocatorService extends ChangeNotifier {
@@ -168,7 +175,7 @@ class LocatorService extends ChangeNotifier {
       final id = target;
       if (id == null) return;
       final prior = beacons.beacons[id]?.status.txAt1m.toDouble() ?? -59;
-      result = estimate(current, priorP0: prior);
+      result = estimate(thin(current), priorP0: prior);
       notifyListeners();
     });
   }

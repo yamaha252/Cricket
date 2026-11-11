@@ -118,7 +118,8 @@ class CricketBle(private val activity: Activity, messenger: BinaryMessenger) :
             addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= 33) {
-            ctx.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            // System broadcasts are still delivered; other apps cannot fake them.
+            ctx.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             ctx.registerReceiver(receiver, filter)
         }
@@ -337,7 +338,7 @@ class CricketBle(private val activity: Activity, messenger: BinaryMessenger) :
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
-            main.post { g.discoverServices() }
+            main.post { if (g == gatt) g.discoverServices() }
         }
 
         override fun onPhyUpdate(g: BluetoothGatt, txPhy: Int, rxPhy: Int, status: Int) {
@@ -345,8 +346,11 @@ class CricketBle(private val activity: Activity, messenger: BinaryMessenger) :
         }
 
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
-            emitConn(mapOf("event" to "state", "state" to "ready", "address" to g.device.address, "status" to status))
-            g.readPhy()
+            main.post {
+                if (g != gatt) return@post
+                emitConn(mapOf("event" to "state", "state" to "ready", "address" to g.device.address, "status" to status))
+                g.readPhy()
+            }
         }
 
         override fun onCharacteristicRead(g: BluetoothGatt, c: BluetoothGattCharacteristic, value: ByteArray, status: Int) {

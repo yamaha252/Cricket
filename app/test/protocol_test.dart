@@ -97,6 +97,16 @@ void main() {
     expect(e.radiusM, lessThan(80));
   });
 
+  test('long walks are thinned evenly for the fit', () {
+    final t0 = DateTime(2026);
+    final all = [for (var i = 0; i < 3000; i++) Sample(0, i.toDouble(), -70, 5, t0)];
+    expect(thin(all.sublist(0, 600)).length, 600);
+    final t = thin(all);
+    expect(t.length, 600);
+    expect(t.first.lon, 0);
+    expect(t.last.lon, 2995);
+  });
+
   test('tile ranges cover bounds', () {
     final r = rangesFor(LatLngBounds(const LatLng(51.0, 71.0), const LatLng(51.1, 71.1)), 10, 12);
     expect(r.length, 3);
