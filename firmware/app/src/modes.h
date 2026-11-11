@@ -15,7 +15,8 @@ enum mode_event {
 	EV_IMPACT,   /* accelerometer threshold */
 	EV_CMD_FIND, /* arg: seconds, 0 stops */
 	EV_CMD_SILENCE,
-	EV_DFU,      /* open the firmware update window */
+	EV_DFU,      /* open the firmware update window; arg 1: from the button */
+	EV_PAIRED,   /* a phone bonded */
 };
 
 int modes_init(void);

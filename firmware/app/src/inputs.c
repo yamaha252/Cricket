@@ -65,7 +65,7 @@ static void boot_hold_fn(struct k_work *w)
 {
 	if (user.boot_hold && user.pressed) {
 		LOG_INF("button held since power-up: DFU");
-		modes_post(EV_DFU, 0);
+		modes_post(EV_DFU, 1);
 	}
 }
 

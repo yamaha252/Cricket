@@ -18,6 +18,7 @@
 #include "impact.h"
 #include "inputs.h"
 #include "msp.h"
+#include "pair.h"
 #include "status.h"
 
 #include <zephyr/kernel.h>
@@ -163,8 +164,11 @@ static void handle(enum mode_event ev, uint8_t arg)
 		}
 		break;
 	case EV_BTN_HOLD3:
-		LOG_INF("pairing requested (not implemented yet)");
+		pair_open();
 		buzzer_play(BUZZ_ACK, 0);
+		break;
+	case EV_PAIRED:
+		buzzer_play(BUZZ_TEST, 0);
 		break;
 	case EV_BTN_HOLD8:
 		if (inputs_vin_present()) {
@@ -205,6 +209,10 @@ static void handle(enum mode_event ev, uint8_t arg)
 		break;
 	case EV_DFU:
 		dfu_open();
+		if (arg) {
+			/* physical access: let a new phone bond too, SMP needs a bonded link */
+			pair_open();
+		}
 		buzzer_play(BUZZ_ACK, 0);
 		break;
 	case EV_CMD_FIND:

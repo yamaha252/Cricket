@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "gatt.h"
 #include "modes.h"
+#include "pair.h"
 #include "status.h"
 
 #include <zephyr/bluetooth/gatt.h>
@@ -57,6 +58,12 @@ static ssize_t write_control(struct bt_conn *conn, const struct bt_gatt_attr *at
 	case CRICKET_CMD_SILENCE:
 		modes_post(EV_CMD_SILENCE, 0);
 		break;
+	case CRICKET_CMD_DFU:
+		modes_post(EV_DFU, 0);
+		break;
+	case CRICKET_CMD_FORGET:
+		pair_forget_others(bt_conn_get_dst(conn));
+		break;
 	default:
 		LOG_WRN("unknown command 0x%02x", cmd[0]);
 		return BT_GATT_ERR(BT_ATT_ERR_NOT_SUPPORTED);
@@ -69,8 +76,9 @@ BT_GATT_SERVICE_DEFINE(cricket_svc,
 	BT_GATT_CHARACTERISTIC(&status_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
 			       BT_GATT_PERM_READ, read_status, NULL, NULL),
 	BT_GATT_CCC(status_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	/* Commands only from a bonded phone: the link must be encrypted (pair.c) */
 	BT_GATT_CHARACTERISTIC(&control_uuid.uuid, BT_GATT_CHRC_WRITE,
-			       BT_GATT_PERM_WRITE, NULL, write_control, NULL),
+			       BT_GATT_PERM_WRITE_ENCRYPT, NULL, write_control, NULL),
 );
 
 void gatt_notify_status(void)

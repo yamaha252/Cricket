@@ -5,11 +5,13 @@
 #include "buzzer.h"
 #include "dfu.h"
 #include "modes.h"
+#include "pair.h"
 #include "status.h"
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
@@ -31,6 +33,15 @@ int main(void)
 	err = bt_enable(NULL);
 	if (err) {
 		LOG_ERR("Bluetooth init failed (%d)", err);
+		return err;
+	}
+	/* bonds from the settings partition */
+	err = settings_load();
+	if (err) {
+		LOG_WRN("settings load failed (%d)", err);
+	}
+	err = pair_init();
+	if (err) {
 		return err;
 	}
 	err = adv_init();
