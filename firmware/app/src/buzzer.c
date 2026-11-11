@@ -57,6 +57,7 @@ static const struct pattern *cur;
 static uint8_t step;
 static bool tone_on;
 static int64_t find_until_ms;
+static bool charging;
 
 static void work_fn(struct k_work *w);
 static K_WORK_DELAYABLE_DEFINE(work, work_fn);
@@ -66,7 +67,7 @@ static void output(bool on, bool loud, bool with_flash)
 	uint32_t period = PWM_HZ(CONFIG_CRICKET_BUZZER_FREQ_HZ);
 
 #if HAS_EN1
-	gpio_pin_set_dt(&en1, on && loud);
+	gpio_pin_set_dt(&en1, on && loud && !charging);
 #else
 	ARG_UNUSED(loud);
 #endif
@@ -141,4 +142,9 @@ void buzzer_play(enum buzz_pattern p, uint8_t duration_s)
 bool buzzer_active(void)
 {
 	return cur != NULL;
+}
+
+void buzzer_set_charging(bool c)
+{
+	charging = c;
 }

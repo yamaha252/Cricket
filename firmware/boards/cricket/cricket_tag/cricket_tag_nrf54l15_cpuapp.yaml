@@ -1,0 +1,16 @@
+identifier: cricket_tag/nrf54l15/cpuapp
+name: Cricket-tag-ISP2454-LX
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+sysbuild: true
+ram: 188
+flash: 1428
+supported:
+  - adc
+  - gpio
+  - i2c
+  - pwm
+  - uart
+  - watchdog

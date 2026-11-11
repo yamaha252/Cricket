@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 /*
  * Button: short press, hold 3 s (pairing), hold 8 s (SHIP); concept.md, «Кнопка».
- * On the DK (CONFIG_CRICKET_DK_SIM) buttons 1-3 stand in for 5 V presence,
- * the MSP armed state and an accelerometer impact.
+ * 5 V presence from VIN_SENSE and charging from CHRG_N (zephyr,user) when the
+ * board has them. On the DK (CONFIG_CRICKET_DK_SIM) buttons 1-3 stand in for
+ * 5 V presence, the MSP armed state and an accelerometer impact.
  */
 #include "inputs.h"
 #include "modes.h"
@@ -25,6 +26,8 @@ struct button {
 	int64_t pressed_at;
 	void (*changed)(struct button *b);
 };
+
+#define USER_NODE DT_PATH(zephyr_user)
 
 static bool vin_present;
 
@@ -50,6 +53,30 @@ static struct button user = {
 	.spec = GPIO_DT_SPEC_GET(DT_ALIAS(user_button), gpios),
 	.changed = user_changed,
 };
+
+#if DT_NODE_HAS_PROP(USER_NODE, vin_sense_gpios)
+static void vin_changed(struct button *b)
+{
+	vin_present = b->pressed;
+	LOG_INF("5 V %s", vin_present ? "on" : "off");
+	modes_post(vin_present ? EV_VIN_ON : EV_VIN_OFF, 0);
+}
+
+static struct button vin = {
+	.spec = GPIO_DT_SPEC_GET(USER_NODE, vin_sense_gpios),
+	.changed = vin_changed,
+};
+#define HAS_VIN 1
+#else
+#define HAS_VIN 0
+#endif
+
+#if DT_NODE_HAS_PROP(USER_NODE, chrg_gpios)
+static const struct gpio_dt_spec chrg = GPIO_DT_SPEC_GET(USER_NODE, chrg_gpios);
+#define HAS_CHRG 1
+#else
+#define HAS_CHRG 0
+#endif
 
 #ifdef CONFIG_CRICKET_DK_SIM
 
@@ -118,6 +145,7 @@ static int button_setup(struct button *b)
 	if (err) {
 		return err;
 	}
+	b->pressed = gpio_pin_get_dt(&b->spec) > 0;
 	k_work_init_delayable(&b->debounce, debounce_fn);
 	gpio_init_callback(&b->cb, isr, BIT(b->spec.pin));
 	err = gpio_add_callback_dt(&b->spec, &b->cb);
@@ -135,6 +163,21 @@ int inputs_init(void)
 		LOG_ERR("user button setup failed (%d)", err);
 		return err;
 	}
+#if HAS_VIN
+	err = button_setup(&vin);
+	if (err) {
+		LOG_ERR("VIN_SENSE setup failed (%d)", err);
+		return err;
+	}
+	vin_present = vin.pressed;
+#endif
+#if HAS_CHRG
+	err = gpio_is_ready_dt(&chrg) ? gpio_pin_configure_dt(&chrg, GPIO_INPUT) : -ENODEV;
+	if (err) {
+		LOG_ERR("CHRG_N setup failed (%d)", err);
+		return err;
+	}
+#endif
 #ifdef CONFIG_CRICKET_DK_SIM
 	for (int i = 0; i < ARRAY_SIZE(sims); i++) {
 		err = button_setup(&sims[i]);
@@ -153,7 +196,20 @@ bool inputs_vin_present(void)
 	return vin_present;
 }
 
+bool inputs_charging(void)
+{
+#if HAS_CHRG
+	return gpio_pin_get_dt(&chrg) > 0;
+#else
+	return false;
+#endif
+}
+
 void inputs_prepare_wakeup(void)
 {
 	gpio_pin_interrupt_configure_dt(&user.spec, GPIO_INT_LEVEL_ACTIVE);
+#if HAS_VIN
+	/* 5 V coming back wakes the beacon into ON_DRONE */
+	gpio_pin_interrupt_configure_dt(&vin.spec, GPIO_INT_LEVEL_ACTIVE);
+#endif
 }

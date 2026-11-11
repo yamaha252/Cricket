@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+
+CONFIG_GPIO=y
+CONFIG_ARM_MPU=y
+
+# No debug UART on the board: UARTE30 is the flight-controller MSP link.
+# Logs go over SWD (RTT), see firmware/app/boards/cricket_tag_nrf54l15_cpuapp.conf.
+CONFIG_SERIAL=n
+CONFIG_CONSOLE=n
+CONFIG_UART_CONSOLE=n

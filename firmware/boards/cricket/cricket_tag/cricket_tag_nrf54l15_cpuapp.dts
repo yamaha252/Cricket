@@ -1,0 +1,208 @@
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * Cricket tag, revision A: Insight SiP ISP2454-LX (nRF54L15, both crystals,
+ * DC/DC inside). Pin map: hardware/cricket-tag/README.md (D-29).
+ */
+
+/dts-v1/;
+
+#include <nordic/nrf54l15_cpuapp.dtsi>
+#include "cricket_tag_nrf54l15_cpuapp-pinctrl.dtsi"
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+	compatible = "cricket,cricket_tag-nrf54l15-cpuapp";
+	model = "Cricket tag ISP2454-LX nRF54L15 Application MCU";
+
+	chosen {
+		zephyr,flash-controller = &rram_controller;
+		zephyr,flash = &cpuapp_rram;
+		zephyr,code-partition = &slot0_partition;
+		zephyr,sram = &cpuapp_sram;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		/* White LED from VBAT, 2N7002 gate on P2.02 (R9 pull-down) */
+		flash_led: led_0 {
+			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
+			label = "White flash LED";
+		};
+	};
+
+	pwmbuzzer {
+		compatible = "pwm-leds";
+
+		buzzer_pwm: buzzer {
+			pwms = <&pwm20 0 PWM_HZ(4000) PWM_POLARITY_NORMAL>;
+			label = "PAM8904E DIN";
+		};
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+
+		user_button: button_0 {
+			gpios = <&gpio1 5 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Button";
+			zephyr,code = <INPUT_KEY_0>;
+		};
+	};
+
+	zephyr,user {
+		/* VBAT through R4/R5 1 MOhm + 1 MOhm on AIN3 */
+		io-channels = <&adc 0>;
+		vbat-full-ohms = <2000000>;
+		vbat-output-ohms = <1000000>;
+		/* 5 V present: R1 1 MOhm / R2 1.5 MOhm divider, wakes from System OFF (D-23) */
+		vin-sense-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+		/* TP4054 open drain, low while charging. P2: no interrupts, poll it. */
+		chrg-gpios = <&gpio2 4 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+		/* PAM8904E EN1: 0 = 1x, 1 = 3x (EN2 tied to VBAT, D-28) */
+		buz-en1-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+	};
+
+	aliases {
+		led0 = &flash_led;
+		sw0 = &user_button;
+		flash-led = &flash_led;
+		buzzer-pwm = &buzzer_pwm;
+		user-button = &user_button;
+		accel0 = &lis2dh12;
+		watchdog0 = &wdt31;
+		mcuboot-button0 = &user_button;
+		mcuboot-led0 = &flash_led;
+	};
+};
+
+&cpuapp_sram {
+	status = "okay";
+};
+
+/*
+ * 32.768 kHz crystal inside the module. ISP2454 datasheet R7, section 2.5,
+ * recommends 19 pF internal load, but the nRF54L SoC code accepts at most
+ * 18 pF (soc.c BUILD_ASSERT): use the maximum. Check the drift on hardware.
+ */
+&lfxo {
+	load-capacitors = "internal";
+	load-capacitance-femtofarad = <18000>;
+};
+
+/* 32 MHz crystal inside the module; the datasheet gives no value, Nordic DK default. */
+&hfxo {
+	load-capacitors = "internal";
+	load-capacitance-femtofarad = <15000>;
+};
+
+&regulators {
+	status = "okay";
+};
+
+/* DC/DC components are inside the module; datasheet currents are with DC/DC on. */
+&vregmain {
+	status = "okay";
+	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
+};
+
+&grtc {
+	owned-channels = <0 1 2 3 4 5 6 7 8 9 10 11>;
+	/* Channels 7-11 reserved for Zero Latency IRQs, 3-4 for FLPR */
+	child-owned-channels = <3 4 7 8 9 10 11>;
+	status = "okay";
+};
+
+&clock {
+	status = "okay";
+};
+
+&radio {
+	status = "okay";
+};
+
+&temp {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&gpio2 {
+	status = "okay";
+};
+
+&gpiote20 {
+	status = "okay";
+};
+
+&gpiote30 {
+	status = "okay";
+};
+
+/* NFC pads are I2C here (board.c clears NFCT.PADCONFIG). */
+&nfct {
+	status = "disabled";
+};
+
+&uart30 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart30_default>;
+	pinctrl-1 = <&uart30_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&i2c21 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+	pinctrl-0 = <&i2c21_default>;
+	pinctrl-1 = <&i2c21_sleep>;
+	pinctrl-names = "default", "sleep";
+
+	/* SA0 on VDD_IO: address 0x19. INT1 on P1.11 (wake source), INT2 not connected. */
+	lis2dh12: lis2dh12@19 {
+		compatible = "st,lis2dh12", "st,lis2dh";
+		reg = <0x19>;
+		irq-gpios = <&gpio1 11 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&pwm20 {
+	status = "okay";
+	pinctrl-0 = <&pwm20_default>;
+	pinctrl-1 = <&pwm20_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&adc {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	/*
+	 * VBAT/2 <= 2.1 V. Gain 1/4 with the 0.9 V reference gives 3.6 V full scale.
+	 * The divider is 500 kOhm with 100 nF (C3) on the pin: long acquisition.
+	 */
+	channel@0 {
+		reg = <0>;
+		zephyr,gain = "ADC_GAIN_1_4";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)>;
+		zephyr,input-positive = <NRF_SAADC_AIN3>; /* P1.07 */
+		zephyr,resolution = <12>;
+		zephyr,oversampling = <4>;
+	};
+};
+
+&wdt31 {
+	status = "okay";
+};
+
+#include <vendor/nordic/nrf54l15_cpuapp_partition.dtsi>

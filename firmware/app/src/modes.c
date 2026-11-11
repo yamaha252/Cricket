@@ -52,7 +52,7 @@ static enum cricket_mode mode;
 static int64_t mode_since;
 static int64_t last_beep;
 static int64_t last_refresh;
-static int64_t last_battery_check;
+static int64_t last_battery_check = -BATTERY_CHECK_MS; /* check on the first tick */
 static bool armed;
 static int64_t msp_seen_at = -1;
 static int64_t impact_at = -1;
@@ -154,7 +154,13 @@ static void handle(enum mode_event ev, uint8_t arg)
 		buzzer_play(BUZZ_ACK, 0);
 		break;
 	case EV_BTN_HOLD8:
-		ship();
+		if (inputs_vin_present()) {
+			/* 5 V would wake it at once; storage mode is for a beacon off the drone */
+			LOG_INF("SHIP refused: 5 V present");
+			buzzer_play(BUZZ_ACK, 0);
+		} else {
+			ship();
+		}
 		break;
 	case EV_VIN_ON:
 		status_update_flags(FLAG_VIN, FLAG_WAS_ARMED | FLAG_IMPACT);
@@ -229,6 +235,13 @@ static void tick_fn(struct k_work *w)
 	int64_t now = k_uptime_get();
 	int64_t in_mode = now - mode_since;
 	k_timeout_t next = K_SECONDS(10);
+
+	{
+		bool charging = inputs_charging();
+
+		buzzer_set_charging(charging);
+		status_update_flags(charging ? FLAG_CHARGING : 0, charging ? 0 : FLAG_CHARGING);
+	}
 
 	if (now - last_battery_check >= BATTERY_CHECK_MS) {
 		check_battery(now);

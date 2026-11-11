@@ -1,0 +1,33 @@
+board:
+  name: cricket_tag
+  full_name: Cricket tag (Insight SiP ISP2454-LX)
+  socs:
+    - name: nrf54l15
+runners:
+  run_once:
+    '--recover':
+      - runners:
+          - nrfjprog
+          - nrfutil
+        run: first
+        groups:
+          - boards:
+              - cricket_tag/nrf54l15/cpuapp
+    '--erase':
+      - runners:
+          - nrfjprog
+          - jlink
+          - nrfutil
+        run: first
+        groups:
+          - boards:
+              - cricket_tag/nrf54l15/cpuapp
+    '--reset':
+      - runners:
+          - nrfjprog
+          - jlink
+          - nrfutil
+        run: last
+        groups:
+          - boards:
+              - cricket_tag/nrf54l15/cpuapp

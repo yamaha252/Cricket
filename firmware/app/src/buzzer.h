@@ -20,3 +20,5 @@ int buzzer_init(void);
 /* duration_s is used by BUZZ_FIND only. A new pattern replaces the one playing. */
 void buzzer_play(enum buzz_pattern pattern, uint8_t duration_s);
 bool buzzer_active(void);
+/* While charging VBAT reaches 4.24 V and 3x would exceed 25 Vpp on CPT-1117-83: force 1x. */
+void buzzer_set_charging(bool charging);
