@@ -6,7 +6,10 @@
 #include "status.h"
 
 int adv_init(void);
-/* Set intervals for the mode; quiet on the drone (flying) silences the radio (ELRS coexistence). */
+/*
+ * Set intervals for the mode; quiet on the drone (flying) silences the radio
+ * (ELRS coexistence): advertising stops and connected phones are dropped.
+ */
 void adv_apply(enum cricket_mode mode, bool quiet);
 /* Push current status into both sets' advertising data. */
 void adv_refresh(void);

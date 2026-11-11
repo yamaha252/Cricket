@@ -165,10 +165,27 @@ int adv_init(void)
 	return 0;
 }
 
+static void disconnect(struct bt_conn *conn, void *data)
+{
+	int err = bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+
+	if (err && err != -ENOTCONN) {
+		LOG_WRN("disconnect failed (%d)", err);
+	}
+}
+
 void adv_apply(enum cricket_mode mode, bool quiet)
 {
 	cur_mode = mode;
 	cur_quiet = quiet;
+
+	/*
+	 * Flying: stopping advertising is not enough, a phone left connected on
+	 * the bench would keep the link up next to the ELRS receiver.
+	 */
+	if (mode == MODE_ON_DRONE && quiet) {
+		bt_conn_foreach(BT_CONN_TYPE_LE, disconnect, NULL);
+	}
 
 	for (int i = 0; i < SET_COUNT; i++) {
 		struct adv_set *s = &sets[i];
