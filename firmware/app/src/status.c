@@ -14,6 +14,7 @@ static int64_t mode_since_ms;
 static uint8_t flags;
 static uint16_t battery_mv;
 static int32_t lat_e7, lon_e7;
+static int64_t pos_at = -1;
 
 void status_init(void)
 {
@@ -61,6 +62,7 @@ void status_set_position(int32_t lat, int32_t lon)
 	K_SPINLOCK(&lock) {
 		lat_e7 = lat;
 		lon_e7 = lon;
+		pos_at = k_uptime_get();
 		flags |= FLAG_POS_VALID;
 	}
 }
@@ -82,6 +84,8 @@ void status_build(struct cricket_payload *out)
 		out->mode_minutes = sys_cpu_to_le16(MIN(minutes, UINT16_MAX));
 		out->lat_e7 = sys_cpu_to_le32(lat_e7);
 		out->lon_e7 = sys_cpu_to_le32(lon_e7);
+		out->pos_age_s = sys_cpu_to_le16(
+			pos_at < 0 ? UINT16_MAX : MIN((k_uptime_get() - pos_at) / 1000, UINT16_MAX - 1));
 	}
 }
 

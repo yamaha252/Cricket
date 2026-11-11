@@ -99,6 +99,20 @@ static const struct gpio_dt_spec chrg = GPIO_DT_SPEC_GET(USER_NODE, chrg_gpios);
 
 static bool sim_armed;
 
+#ifndef CONFIG_CRICKET_MSP
+/* Repeat the simulated MSP state every second like msp.c, or modes.c takes it as stale */
+static void sim_msp_fn(struct k_work *w);
+static K_WORK_DELAYABLE_DEFINE(sim_msp_work, sim_msp_fn);
+
+static void sim_msp_fn(struct k_work *w)
+{
+	if (vin_present) {
+		modes_post(EV_MSP, sim_armed ? MSP_ARMED : 0);
+	}
+	k_work_reschedule(&sim_msp_work, K_SECONDS(1));
+}
+#endif
+
 static void sim_vin_changed(struct button *b)
 {
 	if (b->pressed) {
@@ -114,6 +128,9 @@ static void sim_armed_changed(struct button *b)
 		sim_armed = !sim_armed;
 		LOG_INF("sim: MSP %s", sim_armed ? "armed" : "disarmed");
 		modes_post(EV_MSP, sim_armed ? MSP_ARMED : 0);
+#ifndef CONFIG_CRICKET_MSP
+		k_work_reschedule(&sim_msp_work, K_SECONDS(1));
+#endif
 	}
 }
 

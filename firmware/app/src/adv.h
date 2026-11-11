@@ -6,8 +6,8 @@
 #include "status.h"
 
 int adv_init(void);
-/* Set intervals for the mode; armed on the drone silences the radio (ELRS coexistence). */
-void adv_apply(enum cricket_mode mode, bool armed);
+/* Set intervals for the mode; quiet on the drone (flying) silences the radio (ELRS coexistence). */
+void adv_apply(enum cricket_mode mode, bool quiet);
 /* Push current status into both sets' advertising data. */
 void adv_refresh(void);
 /* Re-read config.c settings (TX power, name, intervals) and restart the sets. */

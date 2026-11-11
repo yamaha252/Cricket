@@ -19,6 +19,7 @@ static const struct bt_uuid_128 svc_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x00));
 static const struct bt_uuid_128 status_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x01));
 static const struct bt_uuid_128 control_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x02));
 static const struct bt_uuid_128 settings_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x03));
+static const struct bt_uuid_128 owner_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x04));
 
 #define STATUS_OFFSET offsetof(struct cricket_payload, version) /* skip Company ID */
 
@@ -103,7 +104,7 @@ static ssize_t write_control(struct bt_conn *conn, const struct bt_gatt_attr *at
 static ssize_t read_settings(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
 			     uint16_t len, uint16_t offset)
 {
-	uint8_t v[96];
+	uint8_t v[160];
 	size_t n = config_encode(v, sizeof(v));
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, v, n);
@@ -125,6 +126,22 @@ static ssize_t write_settings(struct bt_conn *conn, const struct bt_gatt_attr *a
 	return len;
 }
 
+/*
+ * Owner contact for whoever finds the drone: open while the beacon is lost
+ * (ESCALATE, ALARM, BEACON), otherwise only over a bonded link; empty outside.
+ */
+static ssize_t read_owner(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
+			  uint16_t len, uint16_t offset)
+{
+	char v[CFG_OWNER_MAX];
+	size_t n = 0;
+
+	if (alarming() || bt_conn_get_security(conn) >= BT_SECURITY_L2) {
+		n = config_owner(v, sizeof(v));
+	}
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, v, n);
+}
+
 BT_GATT_SERVICE_DEFINE(cricket_svc,
 	BT_GATT_PRIMARY_SERVICE(&svc_uuid),
 	BT_GATT_CHARACTERISTIC(&status_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
@@ -137,6 +154,8 @@ BT_GATT_SERVICE_DEFINE(cricket_svc,
 	BT_GATT_CHARACTERISTIC(&settings_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
 			       BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT,
 			       read_settings, write_settings, NULL),
+	BT_GATT_CHARACTERISTIC(&owner_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
+			       read_owner, NULL, NULL),
 );
 
 void gatt_notify_status(void)

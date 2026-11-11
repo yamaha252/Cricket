@@ -2,7 +2,8 @@
 /*
  * Impact detection with the LIS2DH12: high-pass filtered acceleration above
  * CONFIG_CRICKET_IMPACT_MG on INT1 posts EV_IMPACT; |a| near 0 g for 250 ms,
- * polled at 50 Hz, posts EV_FREEFALL. Active only while 5 V is present.
+ * polled at 50 Hz, posts EV_FREEFALL; motor vibration posts EV_VIBRATION.
+ * Active only while 5 V is present.
  */
 #pragma once
 

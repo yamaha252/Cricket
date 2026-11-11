@@ -14,6 +14,8 @@ enum buzz_pattern {
 	BUZZ_BEACON, /* single loud beep: BEACON */
 	BUZZ_FIND,   /* repeat beeps for the given time: app command */
 	BUZZ_BYE,    /* falling double beep before SHIP */
+	BUZZ_LOW_BATT, /* three long beeps: tag battery low at preflight */
+	BUZZ_NO_MSP, /* two long beeps: flight controller does not answer MSP */
 };
 
 int buzzer_init(void);

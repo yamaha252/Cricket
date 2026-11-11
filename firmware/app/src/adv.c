@@ -44,14 +44,14 @@ static struct bt_data ad[] = {
 static struct bt_data sd[1]; /* device name, set from the app (config.c) */
 
 static enum cricket_mode cur_mode = MODE_STANDBY;
-static bool cur_armed;
+static bool cur_quiet;
 
 /* Interval for the set in the mode, ms; 0: off. Intervals per mode come from config.c. */
-static uint16_t interval_for(int set, enum cricket_mode mode, bool armed)
+static uint16_t interval_for(int set, enum cricket_mode mode, bool quiet)
 {
 	struct cricket_cfg c;
 
-	if (mode >= CFG_MODES || (mode == MODE_ON_DRONE && armed)) {
+	if (mode >= CFG_MODES || (mode == MODE_ON_DRONE && quiet)) {
 		return 0;
 	}
 	config_get(&c);
@@ -165,14 +165,14 @@ int adv_init(void)
 	return 0;
 }
 
-void adv_apply(enum cricket_mode mode, bool armed)
+void adv_apply(enum cricket_mode mode, bool quiet)
 {
 	cur_mode = mode;
-	cur_armed = armed;
+	cur_quiet = quiet;
 
 	for (int i = 0; i < SET_COUNT; i++) {
 		struct adv_set *s = &sets[i];
-		uint16_t ms = interval_for(i, mode, armed);
+		uint16_t ms = interval_for(i, mode, quiet);
 		struct bt_le_adv_param p;
 		int err;
 
@@ -220,7 +220,7 @@ void adv_reload(void)
 		set_tx_power(s, c.tx_dbm[i]);
 		set_data(s);
 	}
-	adv_apply(cur_mode, cur_armed);
+	adv_apply(cur_mode, cur_quiet);
 }
 
 void adv_stop_all(void)

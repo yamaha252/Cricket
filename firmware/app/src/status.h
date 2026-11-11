@@ -7,7 +7,7 @@
 #include <zephyr/toolchain.h>
 
 #define CRICKET_COMPANY_ID  0xFFFF /* Bluetooth SIG value reserved for tests */
-#define CRICKET_PROTO_VER   0x01
+#define CRICKET_PROTO_VER   0x02
 
 enum cricket_mode {
 	MODE_ON_DRONE = 0,
@@ -39,9 +39,11 @@ struct cricket_payload {
 	uint16_t mode_minutes;
 	int32_t lat_e7;
 	int32_t lon_e7;
+	uint16_t pos_age_s; /* seconds since the fix, 0xFFFF: none or older than 18 h */
 } __packed;
 
-BUILD_ASSERT(sizeof(struct cricket_payload) == 22, "payload must fit legacy advertising");
+/* Flags 3 + manufacturer data 2 + 24 = 29 of 31 bytes of legacy advertising */
+BUILD_ASSERT(sizeof(struct cricket_payload) == 24, "payload must fit legacy advertising");
 
 void status_init(void);
 uint32_t status_id(void);

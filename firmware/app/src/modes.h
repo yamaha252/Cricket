@@ -14,6 +14,7 @@ enum mode_event {
 	EV_MSP,      /* arg: MSP_* state bits; on change and every second as a heartbeat */
 	EV_IMPACT,   /* accelerometer threshold */
 	EV_FREEFALL, /* accelerometer near 0 g long enough to be a fall */
+	EV_VIBRATION, /* arg 1: motor vibration started, 0: stopped */
 	EV_CMD_FIND, /* arg: seconds, 0 stops */
 	EV_CMD_SILENCE,
 	EV_DFU,      /* open the firmware update window; arg 1: from the button */

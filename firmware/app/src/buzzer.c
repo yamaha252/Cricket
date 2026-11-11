@@ -46,11 +46,14 @@ PATTERN(p_alarm, true, true, {150, 100}, {150, 100}, {150, 0});
 PATTERN(p_beacon, true, true, {200, 0});
 PATTERN(p_find, true, true, {200, 300});
 PATTERN(p_bye, false, true, {150, 100}, {300, 0});
+PATTERN(p_low_batt, false, true, {400, 200}, {400, 200}, {400, 0});
+PATTERN(p_no_msp, false, false, {400, 200}, {400, 0});
 
 static const struct pattern *patterns[] = {
 	[BUZZ_OFF] = NULL,     [BUZZ_TEST] = &p_test,     [BUZZ_ACK] = &p_ack,
 	[BUZZ_CHIRP] = &p_chirp, [BUZZ_ALARM] = &p_alarm, [BUZZ_BEACON] = &p_beacon,
 	[BUZZ_FIND] = &p_find, [BUZZ_BYE] = &p_bye,
+	[BUZZ_LOW_BATT] = &p_low_batt, [BUZZ_NO_MSP] = &p_no_msp,
 };
 
 static const struct pattern *cur;
