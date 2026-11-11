@@ -105,7 +105,7 @@ firmware/build.sh
 | Button 3 | имитация удара |
 | VCOM (UART) | лог, 115200 |
 
-Сценарии: при включении — STANDBY. Button 1 → ON_DRONE; Button 2 → armed, реклама выключается; Button 1 → 5 В пропало → ALARM. Без Button 2 и Button 3 пропажа 5 В даёт ESCALATE, а через 45 с — ALARM. Короткое нажатие Button 0 гасит тревогу. Рекламу видно в nRF Connect for Mobile: Manufacturer data `0xFFFF`, на Pixel — сканирование 1M и Coded одновременно ([app.md](../docs/app.md)). Команда FIND — запись `01 0A` в характеристику управления (пищать 10 с). Сначала телефон надо привязать: удержать Button 0 3 с, затем записать команду — nRF Connect предложит привязку.
+Сценарии: при включении — STANDBY. Button 1 → ON_DRONE; Button 2 → armed, реклама выключается; Button 1 → 5 В пропало → ALARM. Без Button 2 и Button 3 пропажа 5 В даёт ESCALATE, а через 45 с — ALARM. Короткое нажатие Button 0 гасит тревогу. Рекламу видно в nRF Connect for Mobile: Manufacturer data `0xFFFF`, на Pixel — сканирование 1M и Coded одновременно ([app.md](../docs/app.md)). Команда FIND — запись `01 0A` в характеристику управления (пищать 10 с). Вне тревоги телефон сначала надо привязать: удержать Button 0 3 с, затем записать команду — nRF Connect предложит привязку. В ESCALATE, ALARM и BEACON FIND (до 60 с) принимается и без привязки.
 
 MSP можно проверить на DK с настоящим полётником до прихода плат: `msp-dk.overlay` включает UART30 (TX маячка P0.00 → RX полётника, RX маячка P0.01 ← TX полётника, общая земля). Сначала в Board Configurator поставить VDD DK 3,3 В (по умолчанию 1,8 В, а логика полётника 3,3 В). Сборка:
 

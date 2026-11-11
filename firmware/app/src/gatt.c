@@ -4,6 +4,7 @@
 #include "pair.h"
 #include "status.h"
 
+#include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/logging/log.h>
@@ -19,7 +20,16 @@ static const struct bt_uuid_128 control_uuid = BT_UUID_INIT_128(CRICKET_UUID(0x0
 
 #define STATUS_OFFSET offsetof(struct cricket_payload, version) /* skip Company ID */
 
+#define OPEN_FIND_MAX_S 60 /* FIND from an unbonded phone during an alarm */
+
 static bool notify_enabled;
+
+static bool alarming(void)
+{
+	enum cricket_mode m = status_mode();
+
+	return m == MODE_ESCALATE || m == MODE_ALARM || m == MODE_BEACON;
+}
 
 static ssize_t read_status(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
 			   uint16_t len, uint16_t offset)
@@ -46,6 +56,20 @@ static ssize_t write_control(struct bt_conn *conn, const struct bt_gatt_attr *at
 	}
 	if (len < 1) {
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+	}
+
+	/*
+	 * Commands need a bonded (encrypted) link, except FIND while the beacon is
+	 * in ESCALATE, ALARM or BEACON: a helper's phone may make a crashed drone
+	 * beep. The error makes Android offer pairing, which pair.c accepts only
+	 * inside the pairing window.
+	 */
+	if (bt_conn_get_security(conn) < BT_SECURITY_L2) {
+		if (cmd[0] != CRICKET_CMD_FIND || len != 2 || !alarming()) {
+			return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_ENCRYPTION);
+		}
+		modes_post(EV_CMD_FIND, MIN(cmd[1], OPEN_FIND_MAX_S));
+		return len;
 	}
 
 	switch (cmd[0]) {
@@ -76,9 +100,9 @@ BT_GATT_SERVICE_DEFINE(cricket_svc,
 	BT_GATT_CHARACTERISTIC(&status_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
 			       BT_GATT_PERM_READ, read_status, NULL, NULL),
 	BT_GATT_CCC(status_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-	/* Commands only from a bonded phone: the link must be encrypted (pair.c) */
+	/* Encryption is checked per command in write_control */
 	BT_GATT_CHARACTERISTIC(&control_uuid.uuid, BT_GATT_CHRC_WRITE,
-			       BT_GATT_PERM_WRITE_ENCRYPT, NULL, write_control, NULL),
+			       BT_GATT_PERM_WRITE, NULL, write_control, NULL),
 );
 
 void gatt_notify_status(void)
