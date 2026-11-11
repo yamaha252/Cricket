@@ -13,6 +13,7 @@
 #include "adv.h"
 #include "battery.h"
 #include "buzzer.h"
+#include "dfu.h"
 #include "gatt.h"
 #include "impact.h"
 #include "inputs.h"
@@ -201,6 +202,10 @@ static void handle(enum mode_event ev, uint8_t arg)
 		break;
 	case EV_IMPACT:
 		impact_at = k_uptime_get();
+		break;
+	case EV_DFU:
+		dfu_open();
+		buzzer_play(BUZZ_ACK, 0);
 		break;
 	case EV_CMD_FIND:
 		if (mode != MODE_ON_DRONE || !armed) {

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /*
- * Button: short press, hold 3 s (pairing), hold 8 s (SHIP); concept.md, «Кнопка».
+ * Button: short press, hold 3 s (pairing), hold 8 s (SHIP), held 3 s from
+ * power-up (DFU window); concept.md, «Кнопка».
  * 5 V presence from VIN_SENSE and charging from CHRG_N (zephyr,user) when the
  * board has them. On the DK (CONFIG_CRICKET_DK_SIM) buttons 1-3 stand in for
  * 5 V presence, the MSP armed state and an accelerometer impact.
@@ -17,12 +18,14 @@ LOG_MODULE_REGISTER(inputs, LOG_LEVEL_INF);
 #define DEBOUNCE_MS 30
 #define HOLD_PAIR_MS 3000
 #define HOLD_SHIP_MS 8000
+#define HOLD_DFU_MS 3000 /* held this long from power-up: open the DFU window */
 
 struct button {
 	struct gpio_dt_spec spec;
 	struct gpio_callback cb;
 	struct k_work_delayable debounce;
 	bool pressed;
+	bool boot_hold; /* held since power-up: its release is not a press */
 	int64_t pressed_at;
 	void (*changed)(struct button *b);
 };
@@ -39,6 +42,10 @@ static void user_changed(struct button *b)
 		b->pressed_at = k_uptime_get();
 		return;
 	}
+	if (b->boot_hold) {
+		b->boot_hold = false;
+		return;
+	}
 	held = k_uptime_get() - b->pressed_at;
 	if (held >= HOLD_SHIP_MS) {
 		modes_post(EV_BTN_HOLD8, 0);
@@ -53,6 +60,16 @@ static struct button user = {
 	.spec = GPIO_DT_SPEC_GET(DT_ALIAS(user_button), gpios),
 	.changed = user_changed,
 };
+
+static void boot_hold_fn(struct k_work *w)
+{
+	if (user.boot_hold && user.pressed) {
+		LOG_INF("button held since power-up: DFU");
+		modes_post(EV_DFU, 0);
+	}
+}
+
+static K_WORK_DELAYABLE_DEFINE(boot_hold_work, boot_hold_fn);
 
 #if DT_NODE_HAS_PROP(USER_NODE, vin_sense_gpios)
 static void vin_changed(struct button *b)
@@ -162,6 +179,10 @@ int inputs_init(void)
 	if (err) {
 		LOG_ERR("user button setup failed (%d)", err);
 		return err;
+	}
+	user.boot_hold = user.pressed;
+	if (user.boot_hold) {
+		k_work_reschedule(&boot_hold_work, K_MSEC(HOLD_DFU_MS));
 	}
 #if HAS_VIN
 	err = button_setup(&vin);

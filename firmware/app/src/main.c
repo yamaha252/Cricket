@@ -3,6 +3,7 @@
 #include "adv.h"
 #include "battery.h"
 #include "buzzer.h"
+#include "dfu.h"
 #include "modes.h"
 #include "status.h"
 
@@ -40,5 +41,5 @@ int main(void)
 	if (err) {
 		return err;
 	}
-	return 0;
+	return dfu_init();
 }

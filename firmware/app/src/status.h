@@ -25,6 +25,7 @@ enum cricket_mode {
 #define FLAG_BUZZING   BIT(3)
 #define FLAG_WAS_ARMED BIT(4) /* armed when 5 V was lost */
 #define FLAG_IMPACT    BIT(5) /* impact shortly before 5 V was lost */
+#define FLAG_DFU       BIT(6) /* DFU window open: SMP accepts firmware */
 
 struct cricket_payload {
 	uint16_t company;
