@@ -1,0 +1,19 @@
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * MSP on the nRF54L15 DK for testing with a real flight controller:
+ * UART30, beacon TX on P0.00 -> FC RX, beacon RX on P0.01 <- FC TX, GND common.
+ * Set the DK VDD to 3.3 V in Board Configurator first (default 1.8 V; FC logic is 3.3 V).
+ * Build: firmware/build.sh nrf54l15dk/nrf54l15/cpuapp -p always -- -DEXTRA_DTC_OVERLAY_FILE=msp-dk.overlay
+ */
+
+/ {
+	aliases {
+		msp-uart = &uart30;
+	};
+};
+
+&uart30 {
+	status = "okay";
+	current-speed = <115200>;
+};

@@ -9,6 +9,34 @@ config CRICKET_DK_SIM
 	  reported over MSP, button 3 simulates an impact. Only for the
 	  nRF54L15 DK, where the real inputs are absent.
 
+config CRICKET_MSP
+	bool "MSP link to the flight controller"
+	default $(dt_alias_enabled,msp-uart)
+	select SERIAL
+	select UART_INTERRUPT_DRIVEN
+	select PM_DEVICE
+	help
+	  Polls MSP_STATUS (armed) and MSP_RAW_GPS over the UART aliased
+	  msp-uart while 5 V is present.
+
+config CRICKET_IMPACT
+	bool "Impact detection with the accelerometer"
+	default $(dt_alias_enabled,accel0)
+	select SENSOR
+	select PM_DEVICE
+	help
+	  LIS2DH12 any-motion interrupt on INT1, high-pass filtered.
+	  Needs CONFIG_LIS2DH_TRIGGER and CONFIG_LIS2DH_ACCEL_HP_FILTERS.
+
+config CRICKET_IMPACT_MG
+	int "Impact threshold, mg"
+	default 8000
+	range 1000 15000
+	depends on CRICKET_IMPACT
+	help
+	  Acceleration change above this counts as an impact. Flight
+	  vibration and hard landings must stay below it; tune on a drone.
+
 config CRICKET_BUZZER_FREQ_HZ
 	int "Buzzer drive frequency"
 	default 4000

@@ -14,7 +14,9 @@
 #include "battery.h"
 #include "buzzer.h"
 #include "gatt.h"
+#include "impact.h"
 #include "inputs.h"
+#include "msp.h"
 #include "status.h"
 
 #include <zephyr/kernel.h>
@@ -75,6 +77,14 @@ static void enter(enum cricket_mode m)
 		return;
 	}
 	LOG_INF("%s -> %s", status_mode_name(mode), status_mode_name(m));
+	/* MSP and the accelerometer are only needed on the drone, with 5 V */
+	if (m == MODE_ON_DRONE) {
+		msp_start();
+		impact_enable(true);
+	} else if (mode == MODE_ON_DRONE || mode == MODE_SHIP) {
+		msp_stop();
+		impact_enable(false);
+	}
 	mode = m;
 	mode_since = k_uptime_get();
 	last_beep = 0;
@@ -108,6 +118,8 @@ static void ship(void)
 	mode = MODE_SHIP;
 	status_set_mode(MODE_SHIP);
 	k_work_cancel_delayable(&tick_work);
+	msp_stop();
+	impact_enable(false);
 	adv_stop_all();
 	buzzer_play(BUZZ_BYE, 0);
 	k_work_reschedule(&poweroff_work, K_MSEC(800));
@@ -163,6 +175,10 @@ static void handle(enum mode_event ev, uint8_t arg)
 		}
 		break;
 	case EV_VIN_ON:
+		/* Forget the last flight: until MSP answers the drone counts as disarmed */
+		armed = false;
+		msp_seen_at = -1;
+		impact_at = -1;
 		status_update_flags(FLAG_VIN, FLAG_WAS_ARMED | FLAG_IMPACT);
 		enter(MODE_ON_DRONE);
 		break;
@@ -173,8 +189,12 @@ static void handle(enum mode_event ev, uint8_t arg)
 		break;
 	case EV_ARMED:
 	case EV_DISARMED:
-		armed = ev == EV_ARMED;
+		/* Repeated every second as an MSP heartbeat; act only on a change */
 		msp_seen_at = k_uptime_get();
+		if (armed == (ev == EV_ARMED)) {
+			return;
+		}
+		armed = ev == EV_ARMED;
 		if (mode == MODE_ON_DRONE) {
 			adv_apply(mode, armed);
 		}
@@ -293,6 +313,8 @@ int modes_init(void)
 {
 	int err = inputs_init();
 
+	err = err ?: msp_init();
+	err = err ?: impact_init();
 	if (err) {
 		return err;
 	}
