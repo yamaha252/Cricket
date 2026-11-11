@@ -29,6 +29,7 @@ LOG_MODULE_REGISTER(msp, LOG_LEVEL_INF);
 #define GPS_FRESH_MS   1500
 #define POLL_MS        250 /* MSP_STATUS rate; GPS every GPS_EVERY polls */
 #define GPS_EVERY      4
+#define BOXIDS_EVERY   40  /* polls, disarmed: the FC may be reconfigured while the tag stays on */
 #define HEARTBEAT_MS   1000 /* repeat the armed state so modes know MSP is alive */
 #define MIN_GPS_SATS   4
 #define MAX_PAYLOAD    128
@@ -166,27 +167,31 @@ static void handle_gps(const uint8_t *p, uint8_t len)
 
 static void handle_boxids(const uint8_t *p, uint8_t len)
 {
-	beeper_bit = -1;
-	failsafe_bit = -1;
+	int arm = -1, beeper = -1, failsafe = -1;
+
 	for (int i = 0; i < len; i++) {
 		switch (p[i]) {
 		case BOXARM_ID:
-			arm_bit = i;
+			arm = i;
 			break;
 		case BOXBEEPER_ID:
-			beeper_bit = i;
+			beeper = i;
 			break;
 		case BOXFAILSAFE_ID:
-			failsafe_bit = i;
+			failsafe = i;
 			break;
 		}
 	}
-	if (arm_bit < 0) {
+	if (arm < 0) {
 		LOG_WRN("ARM not in MSP_BOXIDS, assuming bit 0");
-		arm_bit = 0;
+		arm = 0;
 	}
-	LOG_INF("mode flag bits: ARM %d, BEEPER %d, FAILSAFE %d", arm_bit, beeper_bit,
-		failsafe_bit);
+	if (arm != arm_bit || beeper != beeper_bit || failsafe != failsafe_bit) {
+		LOG_INF("mode flag bits: ARM %d, BEEPER %d, FAILSAFE %d", arm, beeper, failsafe);
+	}
+	arm_bit = arm;
+	beeper_bit = beeper;
+	failsafe_bit = failsafe;
 }
 
 static void frame_fn(struct k_work *w)
@@ -271,9 +276,11 @@ static void poll_fn(struct k_work *w)
 	if (!running) {
 		return;
 	}
-	if (arm_bit < 0) {
+	polls++;
+	if (arm_bit < 0 ||
+	    (polls % BOXIDS_EVERY == 0 && (state < 0 || !(state & MSP_ARMED)))) {
 		send(MSP_BOXIDS);
-	} else if (++polls % GPS_EVERY == 0) {
+	} else if (polls % GPS_EVERY == 0) {
 		send(MSP_RAW_GPS);
 	} else {
 		send(MSP_STATUS);

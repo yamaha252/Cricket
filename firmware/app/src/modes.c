@@ -12,7 +12,8 @@
  *             disarmed reported by MSP recently    -> STANDBY (battery swap)
  *             no data at all                        -> ESCALATE -> ALARM
  *   ALARM -> BEACON after ALARM_TIME; ESCALATE/ALARM/BEACON -> STANDBY by button or
- *   app, or back to ON_DRONE when the BEEPER switch goes off or the drone is armed
+ *   app (ON_DRONE if 5 V is present), or back to ON_DRONE when the BEEPER switch
+ *   goes off or the drone is armed
  *   BEEPER switch on (disarmed): beep like FIND until it goes off
  *   5 V back within VIN_GLITCH after a loss in flight: the alarm stays unless the
  *   FC reports armed again (it did not reboot); MSP silent while armed and then
@@ -20,7 +21,7 @@
  *   radio off while flying (armed by MSP, or motor vibration without MSP), except
  *   in failsafe or without RC link: then the drone may be flying away
  *   5 V comes: preflight beep (tag battery, MSP answer)
- *   battery low -> LOW_BAT, critical -> SHIP; long press -> SHIP
+ *   battery low without 5 V -> LOW_BAT, critical -> SHIP; long press -> SHIP
  */
 #include "modes.h"
 #include "adv.h"
@@ -213,7 +214,8 @@ static void ship(void)
 /* Free fall around the last disarm: the drone was disarmed in the air */
 static bool fell_at_disarm(void)
 {
-	return disarmed_at >= 0 && freefall_at >= disarmed_at - DISARM_LEAD_MS;
+	return disarmed_at >= 0 && freefall_at >= 0 &&
+	       freefall_at >= disarmed_at - DISARM_LEAD_MS;
 }
 
 static void power_lost(void)
@@ -262,13 +264,14 @@ static void check_disarm(void)
 	}
 	if (fc_restarted) {
 		flight_lost("FC restarted in flight", false);
-	} else if ((msp & MSP_FAILSAFE) || failsafe_at >= disarmed_at - DISARM_LEAD_MS) {
+	} else if ((msp & MSP_FAILSAFE) ||
+		   (failsafe_at >= 0 && failsafe_at >= disarmed_at - DISARM_LEAD_MS)) {
 		flight_lost("failsafe", false);
 	} else if (fell_at_disarm()) {
 		flight_lost("disarmed in a fall", true);
 	} else if (moving_at_disarm) {
 		flight_lost("disarmed while moving", false);
-	} else if (impact_at >= disarmed_at - IMPACT_WINDOW_MS) {
+	} else if (impact_at >= 0 && impact_at >= disarmed_at - IMPACT_WINDOW_MS) {
 		flight_lost("impact around the disarm", true);
 	}
 }
@@ -290,8 +293,13 @@ static void msp_changed(uint8_t bits)
 		if (bits & MSP_FAILSAFE) {
 			failsafe_at = now;
 		}
-		if (!was_armed && alarming()) {
-			enter(MODE_ON_DRONE); /* flying again */
+		if (!was_armed) {
+			if (buzzer_active()) {
+				buzzer_play(BUZZ_OFF, 0); /* BEEPER switch or preflight beep */
+			}
+			if (alarming()) {
+				enter(MODE_ON_DRONE); /* flying again */
+			}
 		}
 	} else {
 		if (bits & MSP_RXLOSS) {
@@ -336,7 +344,13 @@ static void handle(enum mode_event ev, uint8_t arg)
 	case EV_BTN_SHORT:
 	case EV_CMD_SILENCE:
 		if (alarming()) {
-			enter(MODE_STANDBY);
+			if (inputs_vin_present()) {
+				/* still on a powered drone: keep watching for the next flight */
+				flew = false;
+				enter(MODE_ON_DRONE);
+			} else {
+				enter(MODE_STANDBY);
+			}
 			buzzer_play(BUZZ_ACK, 0);
 		} else if (ev == EV_BTN_SHORT) {
 			buzzer_play(BUZZ_TEST, 0);
@@ -497,19 +511,21 @@ static void preflight_fn(struct k_work *w)
 
 static void check_battery(int64_t now)
 {
-	int mv = battery_mv();
+	int mv;
 
+	if (buzzer_active()) {
+		return; /* the tone sags the battery: measure on a later tick */
+	}
+	mv = battery_mv();
 	last_battery_check = now;
 	if (mv <= 0) {
 		return; /* not measured (DK) */
 	}
 	status_set_battery(mv);
-	if (!inputs_vin_present()) {
-		mv_without_vin = mv;
+	if (inputs_vin_present()) {
+		return; /* charging: no reason to save the battery */
 	}
-	if (mode == MODE_ON_DRONE) {
-		return;
-	}
+	mv_without_vin = mv;
 	if (mv < CRITICAL_BAT_MV) {
 		ship();
 	} else if (mv < LOW_BAT_MV) {

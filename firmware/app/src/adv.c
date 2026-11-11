@@ -6,6 +6,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/hci_vs.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
 #include <string.h>
@@ -46,22 +47,24 @@ static struct bt_data sd[1]; /* device name, set from the app (config.c) */
 static enum cricket_mode cur_mode = MODE_STANDBY;
 static bool cur_quiet;
 
-/* Interval for the set in the mode, ms; 0: off. Intervals per mode come from config.c. */
-static uint16_t interval_for(int set, enum cricket_mode mode, bool quiet)
-{
-	struct cricket_cfg c;
+#define ADV_INTERVAL_MAX 0x4000 /* 10.24 s in 0.625 ms units; the host refuses more */
 
+/* Interval for the set in the mode, ms; 0: off. Intervals per mode come from config.c. */
+static uint16_t interval_for(const struct cricket_cfg *c, int set, enum cricket_mode mode,
+			     bool quiet)
+{
 	if (mode >= CFG_MODES || (mode == MODE_ON_DRONE && quiet)) {
 		return 0;
 	}
-	config_get(&c);
-	return c.interval_ms[mode][set];
+	return c->interval_ms[mode][set];
 }
 
 static struct bt_le_adv_param param_for(const struct adv_set *s, uint16_t ms)
 {
-	uint32_t min = ms * 8 / 5; /* 0.625 ms units */
-	struct bt_le_adv_param p = BT_LE_ADV_PARAM_INIT(s->options, min, min + min / 10, NULL);
+	/* 0.625 ms units; the +10 % window must not pass the limit (10 s intervals) */
+	uint32_t min = MIN(ms * 8U / 5U, ADV_INTERVAL_MAX);
+	uint32_t max = MIN(min + min / 10, ADV_INTERVAL_MAX);
+	struct bt_le_adv_param p = BT_LE_ADV_PARAM_INIT(s->options, min, max, NULL);
 
 	p.sid = s - sets;
 	return p;
@@ -96,7 +99,7 @@ static void set_tx_power(struct adv_set *s, int8_t dbm)
 		return;
 	}
 	rp = (void *)rsp->data;
-	LOG_INF("%s: TX power %d dBm", s->name, rp->selected_tx_power);
+	LOG_DBG("%s: TX power %d dBm", s->name, rp->selected_tx_power);
 	net_buf_unref(rsp);
 }
 
@@ -125,29 +128,46 @@ static void start(struct adv_set *s)
 		return;
 	}
 	err = bt_le_ext_adv_start(s->adv, BT_LE_EXT_ADV_START_DEFAULT);
-	if (err && err != -EALREADY) {
+	/* -ENOMEM: every connection is in use, recycled() starts the set later */
+	if (err && err != -EALREADY && err != -ENOMEM) {
 		LOG_WRN("%s: start failed (%d)", s->name, err);
 	}
 }
 
-/* A connection stops the set it came through; restart once the connection object is free. */
-static void recycled(void)
+/*
+ * A connection stops the set it came through. Restart it at once while another
+ * connection is free, so that a connected phone does not hide the beacon from
+ * other phones, and again once a connection object is released. On the system
+ * work queue, like every other change of the sets.
+ */
+static void restart_fn(struct k_work *w)
 {
 	for (int i = 0; i < SET_COUNT; i++) {
 		start(&sets[i]);
 	}
 }
 
+static K_WORK_DEFINE(restart_work, restart_fn);
+
+static void connected(struct bt_conn *conn, uint8_t err)
+{
+	k_work_submit(&restart_work);
+}
+
+static void recycled(void)
+{
+	k_work_submit(&restart_work);
+}
+
 BT_CONN_CB_DEFINE(adv_conn_cb) = {
+	.connected = connected,
 	.recycled = recycled,
 };
 
 int adv_init(void)
 {
-	struct cricket_cfg c;
 	int err;
 
-	config_get(&c);
 	status_build(&payload);
 
 	for (int i = 0; i < SET_COUNT; i++) {
@@ -159,8 +179,7 @@ int adv_init(void)
 			LOG_ERR("%s: create failed (%d)", s->name, err);
 			return err;
 		}
-		set_tx_power(s, c.tx_dbm[i]);
-		set_data(s);
+		set_data(s); /* TX power is set by adv_apply() before the first start */
 	}
 	return 0;
 }
@@ -176,6 +195,9 @@ static void disconnect(struct bt_conn *conn, void *data)
 
 void adv_apply(enum cricket_mode mode, bool quiet)
 {
+	struct cricket_cfg c;
+
+	config_get(&c);
 	cur_mode = mode;
 	cur_quiet = quiet;
 
@@ -189,7 +211,7 @@ void adv_apply(enum cricket_mode mode, bool quiet)
 
 	for (int i = 0; i < SET_COUNT; i++) {
 		struct adv_set *s = &sets[i];
-		uint16_t ms = interval_for(i, mode, quiet);
+		uint16_t ms = interval_for(&c, i, mode, quiet);
 		struct bt_le_adv_param p;
 		int err;
 
@@ -207,6 +229,8 @@ void adv_apply(enum cricket_mode mode, bool quiet)
 		if (err) {
 			LOG_WRN("%s: update param failed (%d)", s->name, err);
 		}
+		/* after the parameters, which carry "no preference" for the power */
+		set_tx_power(s, c.tx_dbm[i]);
 		start(s);
 		LOG_INF("%s: every %u ms", s->name, ms);
 	}
@@ -222,19 +246,15 @@ void adv_refresh(void)
 
 void adv_reload(void)
 {
-	struct cricket_cfg c;
-
 	if (cur_mode == MODE_SHIP) {
 		return;
 	}
-	config_get(&c);
 	status_build(&payload);
 	for (int i = 0; i < SET_COUNT; i++) {
 		struct adv_set *s = &sets[i];
 
 		bt_le_ext_adv_stop(s->adv);
-		s->interval_ms = UINT16_MAX; /* forces adv_apply to restart the set */
-		set_tx_power(s, c.tx_dbm[i]);
+		s->interval_ms = UINT16_MAX; /* forces adv_apply to set it up again */
 		set_data(s);
 	}
 	adv_apply(cur_mode, cur_quiet);
