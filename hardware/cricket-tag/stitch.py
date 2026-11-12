@@ -57,9 +57,11 @@ def main():
             s, e = t.GetStart(), t.GetEnd()
             tracks.append((mm(s.x), mm(s.y), mm(e.x), mm(e.y), mm(t.GetWidth()) / 2))
     for fp in board.GetFootprints():
+        # площадки под ручную пайку: сшивающее переходное не ближе WIRE_PAD_GAP (D-40)
+        g = gen_pcb.WIRE_PAD_GAP - CLEAR + 0.01 if fp.GetReference() in ("J1", "J2") else 0
         for pad in fp.Pads():
             bb = pad.GetBoundingBox()
-            boxes.append((mm(bb.GetLeft()), mm(bb.GetTop()), mm(bb.GetRight()), mm(bb.GetBottom())))
+            boxes.append((mm(bb.GetLeft()) - g, mm(bb.GetTop()) - g, mm(bb.GetRight()) + g, mm(bb.GetBottom()) + g))
 
     u1 = board.FindFootprintByReference("U1").GetCourtyard(pcbnew.F_CrtYd).BBox()
     forbidden = [

@@ -42,5 +42,8 @@ done
 $KICAD_PY widen.py 2>&1 | q >/dev/null
 $KICAD_PY stitch.py 2>&1 | q
 while [ "$($KICAD_PY cleanup.py --gnd-vias 2>/dev/null | tail -1)" != 0 ]; do :; done
+# уборка (D-40): лишние дорожки GND, пыль, лесенки, тонкие дорожки
+for pass in gnd dust merge widen vias; do $KICAD_PY tidy.py $pass 2>&1 | q; done
+while [ "$($KICAD_PY cleanup.py --gnd-vias 2>/dev/null | tail -1)" != 0 ]; do :; done
 kicad-cli pcb drc cricket-tag.kicad_pcb -o "$TMP/drc.rpt" >/dev/null 2>&1 || true
 grep "Found" "$TMP/drc.rpt"

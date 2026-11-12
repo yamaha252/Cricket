@@ -212,25 +212,69 @@ ESCAPE_VIAS = [("pad:29", 0.5, 0.3, (-2.1, 1.95)), ("pad:7", 0.5, 0.3, (2.4, 1.5
 
 def driver_ground(board, netinfo):
     """PAM8904E: переходное в центральной площадке (13) на нижнюю землю и вывод 5 к ней.
-    Площадка окружена выводами, заливка сверху к ней не подходит."""
+    Площадка окружена выводами, заливка сверху к ней не подходит. Снизу под драйвером лежат
+    площадки батареи J2, между ними медь не нужна (перемычка припоя при пайке провода замкнёт
+    батарею), поэтому переходное сдвинуто к краю площадки, к J2.2 (GND), и соединено с ней дорожкой."""
     u4 = board.FindFootprintByReference("U4")
     ep = next(p for p in u4.Pads() if p.GetNumber() == "13").GetPosition()
     p5 = next(p for p in u4.Pads() if p.GetNumber() == "5").GetPosition()
-    t = pcbnew.PCB_TRACK(board)
-    t.SetStart(p5)
-    t.SetEnd(ep)
-    t.SetWidth(pcbnew.FromMM(0.25))
-    t.SetLayer(pcbnew.F_Cu)
-    t.SetNet(netinfo["GND"])
-    t.SetLocked(True)
-    board.Add(t)
-    v = pcbnew.PCB_VIA(board)
-    v.SetPosition(ep)
-    v.SetWidth(pcbnew.FromMM(0.5))
-    v.SetDrill(pcbnew.FromMM(0.3))
-    v.SetNet(netinfo["GND"])
-    v.SetLocked(True)
-    board.Add(v)
+    via = pcbnew.VECTOR2I(ep.x - pcbnew.FromMM(0.245), ep.y)
+    for a, b, layer in ((p5, ep, pcbnew.F_Cu), (via, pcbnew.VECTOR2I(ep.x - pcbnew.FromMM(0.6), ep.y), pcbnew.B_Cu)):
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(a)
+        t.SetEnd(b)
+        t.SetWidth(pcbnew.FromMM(0.25))
+        t.SetLayer(layer)
+        t.SetNet(netinfo["GND"])
+        t.SetLocked(True)
+        board.Add(t)
+    # Минус батареи J2.2 снизу зажат дорожками VBAT и BUZ_DIN и площадкой J2.1: к нижней земле ему
+    # не выйти. Второе переходное внутри J2.2 выводит его на верхнюю заливку под U4.3 и U4.4, чтобы весь
+    # ток батареи не шёл через одно отверстие в центральной площадке драйвера (D-41).
+    for at in (via, pcbnew.VECTOR2I(ep.x - pcbnew.FromMM(1.025), ep.y + pcbnew.FromMM(0.975))):
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(at)
+        v.SetWidth(pcbnew.FromMM(0.5))
+        v.SetDrill(pcbnew.FromMM(0.3))
+        v.SetNet(netinfo["GND"])
+        v.SetLocked(True)
+        board.Add(v)
+
+
+# Площадки под ручную пайку проводов (J1 — полётник, J2 — батарея): заливка между ними и
+# ближе WIRE_PAD_GAP не нужна, чужие дорожки и переходные держит на том же расстоянии правило
+# wire_pad_clearance в cricket-tag.kicad_dru. Между площадками 0,8 мм, так что дорожка 0,15 мм
+# по середине проходит с зазором 0,325 мм.
+WIRE_PAD_GAP = 0.3
+
+
+def wire_pad_keepouts(board):
+    """Зоны без заливки на нижнем слое вокруг J1 и J2. Старые с тем же именем заменяются."""
+    g = pcbnew.FromMM(WIRE_PAD_GAP)
+    rects = {}
+    for ref in ("J1", "J2"):   # читать до board.Remove: после него SWIG KiCad 10 отдаёт сырые объекты
+        boxes = [p.GetBoundingBox() for p in board.FindFootprintByReference(ref).Pads()]
+        rects[ref] = (min(b.GetLeft() for b in boxes) - g, min(b.GetTop() for b in boxes) - g,
+                      max(b.GetRight() for b in boxes) + g, max(b.GetBottom() for b in boxes) + g)
+    for z in [z for z in board.Zones() if z.GetIsRuleArea() and z.GetZoneName().startswith("wire-pads-")]:
+        board.Remove(z)
+    for ref, (x0, y0, x1, y1) in rects.items():
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetZoneName(f"wire-pads-{ref}")
+        z.SetLayer(pcbnew.B_Cu)
+        z.SetDoNotAllowZoneFills(True)
+        z.SetDoNotAllowTracks(False)
+        z.SetDoNotAllowVias(False)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowFootprints(False)
+        o = pcbnew.SHAPE_POLY_SET()
+        o.NewOutline()
+        for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
+            o.Append(x, y)
+        z.SetOutline(o)
+        _keep.append(o)
+        board.Add(z)
 
 
 # Обвязка PAM8904E (D-29), точки от центра U4. Порядок выводов по кругу — 12 VBAT, 11 CP2,
@@ -239,23 +283,24 @@ def driver_ground(board, netinfo):
 # эти связи не находит. CP2 уходит вниз переходным между C10 и C13 и выходит к C12;
 # CP1 — переходным над J2 и по низу справа от J2 к C11; VOUT по диагонали к C13 и C14;
 # VBAT вывода 12 — переходным прямо на J2.1; OUTP — к переходному справа от C12,
-# дальше к излучателю разводит Freerouting или maze.py.
+# дальше к излучателю разводит Freerouting или maze.py. Всё, что идёт по низу, держится не ближе
+# WIRE_PAD_GAP (0,3 мм) к площадкам J2: их паяют руками.
 DRIVER_TRACKS = [   # (вывод U4, ширина, слой, точки…)
     ("12", 0.25, "F", (-0.4, -0.9), (-0.4, -1.407), (-1.032, -1.407), (-1.775, -2.15)),
-    ("12", 0.25, "F", (-0.9, -1.1), (-0.9, -1.407)),
-    ("12", 0.25, "B", (-0.9, -1.1), (0.75, -1.1), (0.75, -0.4)),
+    ("12", 0.25, "F", (-0.9, -1.275), (-0.9, -1.407)),
+    ("12", 0.25, "B", (-0.9, -1.275), (0.75, -1.275), (0.75, -0.4)),
     # 0,12 мм: щель между углом C10.2 и выводом 10 — 0,41 мм
     ("11", 0.12, "F", (0.0, -0.9), (0.0, -1.162), (0.63, -1.792), (0.63, -2.15)),
-    ("11", 0.15, "B", (0.63, -2.15), (1.38, -2.15), (2.13, -1.4), (2.3, -1.4)),
+    ("11", 0.15, "B", (0.63, -2.15), (1.55, -2.15), (2.3, -1.4)),
     ("11", 0.15, "F", (2.3, -1.4), (2.3, -0.68)),
-    ("10", 0.15, "F", (0.4, -0.9), (0.4, -1.15), (0.77, -1.52), (1.37, -1.52), (1.37, -3.1)),
-    ("9", 0.15, "F", (0.9, -0.4), (1.3, -0.4), (1.6, -0.7), (1.6, -1.1)),
-    ("9", 0.15, "B", (1.6, -1.1), (2.0, -0.7), (2.0, 1.53), (1.005, 2.525)),
+    ("10", 0.15, "F", (0.4, -0.9), (0.4, -1.15), (0.77, -1.52), (1.275, -1.52), (1.275, -3.1)),
+    ("9", 0.15, "F", (0.9, -0.4), (1.3, -0.4), (1.675, -0.775), (1.675, -1.255)),
+    ("9", 0.15, "B", (1.675, -1.255), (1.775, -1.255), (2.105, -0.925), (2.105, 1.425), (1.005, 2.525)),
     ("9", 0.15, "F", (1.005, 2.525), (0.48, 2.0)),
-    ("7", 0.15, "F", (0.9, 0.4), (1.35, 0.4), (1.95, 1.0), (2.5, 1.0)),
+    ("7", 0.15, "F", (0.9, 0.4), (1.35, 0.4), (1.95, 1.0), (2.625, 1.0)),
 ]
-DRIVER_VIAS = [("12", (-0.9, -1.1)), ("11", (0.63, -2.15)), ("11", (2.3, -1.4)),
-               ("9", (1.6, -1.1)), ("9", (1.005, 2.525)), ("7", (2.5, 1.0))]
+DRIVER_VIAS = [("12", (-0.9, -1.275)), ("11", (0.63, -2.15)), ("11", (2.3, -1.4)),
+               ("9", (1.675, -1.255)), ("9", (1.005, 2.525)), ("7", (2.625, 1.0))]
 
 
 def driver_routes(board, skip_existing=False):
@@ -429,6 +474,7 @@ def main(netlist):
     module_escape(board, netinfo)
     driver_ground(board, netinfo)
     driver_routes(board)
+    wire_pad_keepouts(board)
 
     # Подписи площадок под провода на нижней стороне
     j1 = board.FindFootprintByReference("J1")

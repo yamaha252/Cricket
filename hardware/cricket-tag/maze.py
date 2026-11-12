@@ -92,6 +92,8 @@ class Grid:
 
     def pads(self, board, net, h, rv):
         for fp in board.GetFootprints():
+            # площадки под ручную пайку: чужая медь не ближе WIRE_PAD_GAP (D-40)
+            c = gen_pcb.WIRE_PAD_GAP + 0.01 if fp.GetReference() in ("J1", "J2") else CLEAR
             for pad in fp.Pads():
                 if pad.GetNetCode() == net:
                     continue
@@ -99,7 +101,7 @@ class Grid:
                 lays = tuple(lay for lay, kl in ((F, pcbnew.F_Cu), (B, pcbnew.B_Cu)) if pad.IsOnLayer(kl))
                 self.rect(mm(bb.GetLeft()) - self.ox, mm(bb.GetTop()) - self.oy,
                           mm(bb.GetRight()) - self.ox, mm(bb.GetBottom()) - self.oy,
-                          h + CLEAR, lays, via_pad=max(rv + CLEAR, VIA_DRILL / 2 + 0.22))
+                          h + c, lays, via_pad=max(rv + c, VIA_DRILL / 2 + 0.22))
 
     def idx(self, x, y):
         return int(round(y / STEP)) * self.nx + int(round(x / STEP))

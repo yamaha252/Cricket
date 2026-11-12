@@ -1,0 +1,8 @@
+(version 1)
+
+# Площадки под ручную пайку проводов (J1 — полётник, J2 — батарея): чужая медь не ближе 0,3 мм,
+# чтобы паяльник и перемычка припоя не доставали до соседних цепей под маской.
+(rule "wire_pad_clearance"
+	(layer "B.Cu")
+	(condition "A.Type == 'Pad' && (A.memberOfFootprint('J1') || A.memberOfFootprint('J2'))")
+	(constraint clearance (min 0.3mm)))
