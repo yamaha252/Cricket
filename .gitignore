@@ -15,6 +15,14 @@ firmware/.west/
 # Python
 __pycache__/
 
+# IDE (JetBrains, VS Code)
+.idea/
+*.iml
+.vscode/
+
+# Claude Code, personal settings
+.claude/settings.local.json
+
 # OS
 .DS_Store
 
