@@ -1,6 +1,6 @@
 # Приложение Cricket
 
-Flutter, Android первым (D-38). Функции и ограничения — в [docs/app.md](../docs/app.md), протокол — в [docs/protocol.md](../docs/protocol.md).
+Flutter, Android первым (D-38), iOS из того же кода (D-39). Функции и ограничения — в [docs/app.md](../docs/app.md), протокол — в [docs/protocol.md](../docs/protocol.md).
 
 Оформление пока черновое: сначала функции.
 
@@ -14,6 +14,18 @@ flutter build apk --debug
 ```
 
 Нужны Flutter 3.44+, Android SDK 36 и JDK 17+. Минимальный Android — 8.0 (API 26: `ScanSettings.setPhy`). Запуск на телефоне: `flutter run` с подключённым по USB телефоном.
+
+### iOS
+
+```bash
+cd app
+flutter run -d <симулятор или iPhone>
+flutter build ios --release --no-codesign
+```
+
+Нужен Xcode (проверено с 27.2); плагины подключаются через Swift Package Manager, CocoaPods не нужен. Минимальная iOS — 15.0. Для установки на iPhone в Xcode нужно выбрать команду подписи (Runner → Signing & Capabilities); в репозитории её нет.
+
+`flutter build ios --simulator` с Flutter 3.44.6 и Xcode 27 падает: `lipo -verify_arch` в Xcode 27 не принимает две архитектуры, а Flutter передаёт `arm64 x86_64`. `flutter run -d <симулятор>` собирает одну архитектуру и работает. В симуляторе нет Bluetooth: приложение показывает «Bluetooth недоступен», карта работает.
 
 ## Что сделано
 
@@ -32,17 +44,18 @@ flutter build apk --debug
 
 ## Офлайн
 
-Без сети работает всё: Bluetooth, GPS (через `LocationManager`, без Play-сервисов), пеленг, карта из памяти.
+Без сети работает всё: Bluetooth, GPS (на Android через `LocationManager`, без Play-сервисов; на iOS Core Location работает без сети сам), пеленг, карта из памяти.
 
 - **OpenTopoMap** — подложка по умолчанию: горизонтали, отмывка рельефа, лес, тропы. Просмотренные тайлы сохраняются; на вкладке «Офлайн-карты» видимая область скачивается для масштабов на выбор (до 30 000 тайлов за раз).
 - **OpenStreetMap** — только кэш просмотренного: массовая загрузка запрещена правилами tile.openstreetmap.org.
 - **MBTiles** — любая растровая карта (спутник, топо), подготовленная на компьютере (например, в MOBAC или QGIS), добавляется файлом.
 
-Тайлы лежат в `files/tiles/<источник>/z/x/y.png` внутри приложения.
+Тайлы лежат в `tiles/<источник>/z/x/y.png` в каталоге поддержки приложения (`files/` на Android, `Library/Application Support/` на iOS).
 
 ## Устройство
 
 - `android/app/src/main/kotlin/dev/cricket/cricket/CricketBle.kt` — свой BLE-слой: сканирование, GATT (одна операция за раз), привязка, разрешения, писк `ToneGenerator`, экран без сна. Сторонних BLE-плагинов нет: у `flutter_blue_plus` 2.x платная лицензия для коммерции.
+- `ios/Runner/CricketBle.swift` — тот же слой на CoreBluetooth с теми же каналами (D-39): только 1M, вместо адреса UUID периферии, привязка чтением зашифрованной характеристики настроек, писк через `AVAudioEngine`.
 - `lib/ble/ble.dart` — Dart-обёртка каналов `cricket/ble`, `cricket/scan`, `cricket/conn`.
 - `lib/protocol/cricket.dart` — реклама v2, UUID, команды, настройки TLV с проверкой как в прошивке.
 - `lib/state/` — список маячков, GPS, пеленг.
@@ -53,12 +66,13 @@ flutter build apk --debug
 
 - Юнит-тесты: разбор рекламы, настройки TLV, пеленг на синтетическом обходе (ошибка < 25 м), тайловая математика.
 - Эмулятор Pixel 7 Pro (API 35): запуск, сканирование стартует, карта OpenTopoMap грузится и показывается без сети из кэша, загрузка области.
-- С настоящим маячком и на Pixel 7 Pro **не проверено**: приём Coded, GATT, привязка.
+- Симулятор iPhone 17 Pro (iOS 26.4): сборка, запуск, «Bluetooth недоступен» (в симуляторе его нет), тайлы OpenTopoMap скачиваются и сохраняются. Релизная сборка под iPhone без подписи собирается.
+- С настоящим маячком и на Pixel 7 Pro / iPhone **не проверено**: приём Coded, GATT, привязка.
 
 ## Не сделано
 
 - Фоновое сканирование (foreground service): сейчас скан останавливается в фоне, если не идёт запись пеленга, и Android может его прервать.
 - Обновление прошивки по BLE (MCUmgr SMP).
 - Сети Apple Find My и Google Find Hub (D-33).
-- iOS: нет нативного BLE-слоя (Swift/CoreBluetooth), только 1M.
+- iOS: фоновое сканирование, подпись и проверка на настоящем iPhone.
 - Подпись релизной сборки, иконка, оформление.

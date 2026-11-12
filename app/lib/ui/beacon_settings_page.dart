@@ -89,7 +89,15 @@ class _BeaconSettingsPageState extends State<BeaconSettingsPage> {
     }
     setState(() => _saving = true);
     try {
-      final st = await Ble.instance.write(settingsUuid, s.encode());
+      int st;
+      try {
+        st = await Ble.instance.write(settingsUuid, s.encode());
+      } on BleException {
+        // The link dropped while the form was being edited: open it again
+        // rather than make the user retype everything.
+        await Ble.instance.connect(widget.address);
+        st = await Ble.instance.write(settingsUuid, s.encode());
+      }
       if (mounted) showSnack(context, st == 0 ? 'Сохранено' : 'Не сохранено: ${gattStatusText(st)}');
     } catch (e) {
       if (mounted) showSnack(context, '$e');

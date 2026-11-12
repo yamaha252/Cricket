@@ -35,6 +35,11 @@ class _MapPageState extends State<MapPage> {
       if (lat != null && lon != null) {
         _initial = LatLng(lat, lon);
         _initialZoom = p.getDouble('map_zoom') ?? 14;
+      } else {
+        // First start: nothing to return to, go to the phone's position
+        // once it is known.
+        _follow = true;
+        _initialZoom = 15;
       }
       if (!mounted) return;
       // A focus requested before the map was ready becomes its start view.
@@ -43,6 +48,7 @@ class _MapPageState extends State<MapPage> {
         _map!.focus = null;
         _initial = f;
         _initialZoom = 16;
+        _follow = false;
       }
       setState(() => _loaded = true);
     });
@@ -66,6 +72,8 @@ class _MapPageState extends State<MapPage> {
     final f = _map?.focus;
     if (f != null && _loaded) {
       _map!.focus = null;
+      // Otherwise the next GPS fix would pull the map back to the phone.
+      _follow = false;
       try {
         _controller.move(f, math.max(_controller.camera.zoom, 16));
       } catch (_) {
@@ -141,6 +149,10 @@ class _MapPageState extends State<MapPage> {
                   tileProvider: OfflineTileProvider(src),
                   minNativeZoom: src.minZoom,
                   maxNativeZoom: src.maxZoom,
+                  // Each step below the file's smallest zoom quadruples the
+                  // tiles to draw: an imported map of one field would ask
+                  // for thousands when zoomed out to the country.
+                  minZoom: src.isMbtiles ? math.max(0, src.minZoom - 3).toDouble() : 0,
                   maxZoom: 20,
                   userAgentPackageName: 'dev.cricket.cricket',
                 ),
@@ -233,7 +245,24 @@ class _MapPageState extends State<MapPage> {
               ),
             ),
             if (s.position.error != null)
-              Positioned(left: 12, top: 12, right: 64, child: Card(child: Padding(padding: const EdgeInsets.all(8), child: Text(s.position.error!)))),
+              Positioned(
+                left: 12,
+                top: 12,
+                right: 64,
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: s.position.resolve,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Row(children: [
+                        Expanded(child: Text(s.position.error!)),
+                        const Icon(Icons.settings, size: 18),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
             if (loc.target != null) Positioned(left: 8, right: 8, bottom: 8, child: _LocatorPanel(services: s)),
           ]);
         },

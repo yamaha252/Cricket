@@ -4,6 +4,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+import '../protocol/cricket.dart';
+
 const int phy1M = 1;
 const int phyCoded = 3;
 
@@ -51,9 +53,13 @@ class AdapterInfo {
         enabled = m['enabled'] as bool? ?? false,
         codedSupported = m['codedSupported'] as bool? ?? false,
         extendedSupported = m['extendedSupported'] as bool? ?? false,
-        model = m['model'] as String? ?? '';
+        model = m['model'] as String? ?? '',
+        ios = m['platform'] == 'ios';
   final bool present, enabled, codedSupported, extendedSupported;
   final String model;
+
+  /// iPhone: 1M only, no MAC address, pairing through an encrypted read.
+  final bool ios;
 }
 
 class BleException implements Exception {
@@ -149,7 +155,9 @@ class Ble {
   Future<Uint8List> read(String uuid) => _serial(() async {
         final r = await _call<Map>('read', {'uuid': uuid});
         final status = r['status'] as int;
-        if (status != 0) throw BleException('Чтение: статус $status', status: status);
+        if (status != 0) {
+          throw BleException('Чтение: ${gattStatusText(status)}', status: status);
+        }
         return r['value'] as Uint8List;
       });
 

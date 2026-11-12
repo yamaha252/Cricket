@@ -159,6 +159,10 @@ class LocatorService extends ChangeNotifier {
     final rec = beacons.beacons[target];
     if (pos == null || rec == null) return;
     final now = DateTime.now();
+    // A notification without a new fix (GPS lost, an error) must not pin
+    // fresh RSSI to the old place.
+    final fixTime = position.lastTime;
+    if (fixTime == null || now.difference(fixTime) > const Duration(seconds: 5)) return;
     if (now.difference(_lastSample) < const Duration(seconds: 1)) return;
     if (pos.accuracy > 30) return;
     final rssi = rec.medianRssi(const Duration(seconds: 2));

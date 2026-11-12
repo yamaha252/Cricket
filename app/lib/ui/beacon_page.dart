@@ -73,6 +73,10 @@ class _BeaconPageState extends State<BeaconPage> {
       }
       await action();
     } on TimeoutException {
+      // The native side may still be waiting (pairing dialog left open):
+      // dropping the link frees it for the next action.
+      _connected = null;
+      await Ble.instance.disconnect();
       if (mounted) showSnack(context, 'Маячок не ответил вовремя');
     } on PlatformException catch (e) {
       if (mounted) showSnack(context, e.message ?? e.code);
@@ -80,7 +84,13 @@ class _BeaconPageState extends State<BeaconPage> {
       _connected = null;
       if (mounted) showSnack(context, '$e');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      } else {
+        // The page was closed while the link was being opened: dispose() did
+        // not know about it yet.
+        Ble.instance.disconnect();
+      }
     }
   }
 
@@ -117,7 +127,11 @@ class _BeaconPageState extends State<BeaconPage> {
           throw BleException('Телефон не начал привязку');
         }
         final e = await bonded;
-        if (e['bond'] != 'bonded') throw BleException('Привязка отклонена: окно привязки закрыто?');
+        if (e['bond'] != 'bonded') {
+          throw BleException(e['status'] == forgottenStatus
+              ? 'Привязка не прошла: $forgottenText'
+              : 'Привязка отклонена: окно привязки закрыто?');
+        }
       }
       if (!mounted) return;
       final label = await _askLabel(store.labelOf(widget.id));
@@ -210,7 +224,9 @@ class _BeaconPageState extends State<BeaconPage> {
       child: Column(children: [
         SwitchListTile(
           title: const Text('Пеленг: записывать сигнал и GPS'),
-          subtitle: Text(n == 0
+          subtitle: Text(services.position.reduced
+              ? 'Геолокация приблизительная: точки не записываются. Включите точную геопозицию в настройках телефона'
+              : n == 0
               ? 'Ходите вокруг: приложение построит область, где лежит маячок'
               : 'Точек: $n${loc.target == r.id && loc.result != null ? ', оценка ±${loc.result!.radiusM.round()} м' : ''}'),
           value: active,

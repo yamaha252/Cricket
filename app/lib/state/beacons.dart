@@ -106,6 +106,9 @@ class BeaconStore extends ChangeNotifier {
     l.sort((a, b) {
       final am = mine.containsKey(a.id), bm = mine.containsKey(b.id);
       if (am != bm) return am ? -1 : 1;
+      // A beacon heard now goes above one that fell silent with a strong
+      // last reading.
+      if (a.fresh != b.fresh) return a.fresh ? -1 : 1;
       return (b.smoothRssi ?? -200).compareTo(a.smoothRssi ?? -200);
     });
     return l;
@@ -222,8 +225,13 @@ class BeaconStore extends ChangeNotifier {
     if (st == null) return;
     final r = beacons.putIfAbsent(st.id, () => BeaconRecord(st.id));
     r.status = st;
-    r.address = p.address;
+    // Only a connectable set gives an address GATT can use (the sets may get
+    // separate addresses, docs/protocol.md).
+    if (p.connectable || r.address.isEmpty) r.address = p.address;
     if (p.name != null && p.name!.isNotEmpty) r.name = p.name;
+    // After a pause the old average says nothing about where the phone is
+    // now: start over instead of dragging it along.
+    if (p.time.difference(r.lastSeen) > const Duration(seconds: 6)) r.smoothRssi = null;
     r.lastSeen = p.time;
     if (p.coded) {
       r.codedPackets++;

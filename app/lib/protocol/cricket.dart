@@ -240,8 +240,8 @@ class BeaconSettings {
   /// Local check mirroring the firmware rules, so the user sees the reason
   /// instead of a bare ATT error. Returns null if valid.
   String? validate() {
-    if (utf8.encode(name).isEmpty || utf8.encode(name).length > 20) return 'Имя: 1–20 байт';
-    if (utf8.encode(contact).length > 64) return 'Контакт: до 64 байт';
+    if (utf8.encode(name).isEmpty || utf8.encode(name).length > 20) return 'Имя: от 1 до 20 байт (русская буква занимает 2)';
+    if (utf8.encode(contact).length > 64) return 'Контакт: до 64 байт (русская буква занимает 2)';
     for (final p in [txCoded, tx1m]) {
       if (p < -40 || p > 8) return 'Мощность: −40…+8 дБм';
     }
@@ -259,7 +259,13 @@ class BeaconSettings {
   }
 }
 
-/// Human-readable meaning of a GATT status returned by a write.
+/// iOS still holds pairing keys the beacon has erased (FORGET from another
+/// phone, a fifth phone pushed this one out): only the user can drop them.
+const forgottenStatus = 0x20E;
+const forgottenText = 'маячок забыл этот телефон: в настройках Bluetooth iPhone '
+    'выберите «Забыть это устройство» и привяжите заново';
+
+/// Human-readable meaning of a GATT status returned by a read or a write.
 String gattStatusText(int status) => switch (status) {
       0 => 'OK',
       5 || 15 => 'нужна привязка (шифрование)',
@@ -267,5 +273,9 @@ String gattStatusText(int status) => switch (status) {
       13 => 'неверная длина',
       0xFF => 'значение вне допустимого',
       133 => 'ошибка GATT (133)',
+      // iOS, CoreBluetooth errors passed as 0x200 + CBError code.
+      0x20E => forgottenText,
+      0x20F => 'шифрование не установилось, повторите',
+      0x206 || 0x207 => 'связь с маячком потеряна',
       _ => 'ошибка $status',
     };

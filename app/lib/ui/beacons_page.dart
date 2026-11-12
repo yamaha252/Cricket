@@ -23,9 +23,11 @@ class BeaconsPage extends StatelessWidget {
             children: [
               _ScanBanner(store: store),
               if (list.isEmpty && store.state == ScanState.scanning)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: Text('Ищу маячки…\nCoded PHY и 1M', textAlign: TextAlign.center)),
+                Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                      child: Text(store.adapter?.ios == true ? 'Ищу маячки…' : 'Ищу маячки…\nCoded PHY и 1M',
+                          textAlign: TextAlign.center)),
                 ),
               for (final r in list) _BeaconTile(record: r, mine: store.mine.containsKey(r.id)),
             ],
@@ -54,7 +56,10 @@ class _ScanBanner extends StatelessWidget {
                 child: const Text('Разрешить')));
       case ScanState.bluetoothOff:
         return _banner(context, Icons.bluetooth_disabled, 'Bluetooth выключен',
-            action: TextButton(onPressed: () => Ble.instance.requestEnable(), child: const Text('Включить')));
+            // iOS has no "turn on" dialog: the button opens the app's settings.
+            action: TextButton(
+                onPressed: () => Ble.instance.requestEnable(),
+                child: Text(a?.ios == true ? 'Настройки' : 'Включить')));
       case ScanState.unsupported:
         return _banner(context, Icons.error_outline, 'Bluetooth недоступен ${store.error ?? ''}');
       case ScanState.failed:
@@ -64,9 +69,11 @@ class _ScanBanner extends StatelessWidget {
         return _banner(context, Icons.pause, 'Сканирование остановлено',
             action: TextButton(onPressed: store.start, child: const Text('Старт')));
       case ScanState.scanning:
-        final coded = store.codedTotal > 0
-            ? 'Coded PHY принимается'
-            : (a?.codedSupported == true ? 'Coded заявлен, пакетов ещё не было' : 'Coded не заявлен телефоном');
+        final coded = a?.ios == true
+            ? 'iPhone принимает только 1M'
+            : store.codedTotal > 0
+                ? 'Coded PHY принимается'
+                : (a?.codedSupported == true ? 'Coded заявлен, пакетов ещё не было' : 'Coded не заявлен телефоном');
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(children: [
