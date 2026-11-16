@@ -62,7 +62,7 @@ west build -b nrf54l15dk/nrf54l15/cpuapp nrf/samples/bluetooth/peripheral_lbs -d
 nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54l15dk/nrf54l15/cpuapp <app> -d <build-dir>
 ```
 
-Целевая плата для `firmware/` — свой board definition под ISP2454-LX (nRF54L15, D-29), пока его нет, собирать под `nrf54l15dk/nrf54l15/cpuapp`; отладочная плата — nRF54L15 DK.
+Цели для `firmware/`: своя плата `cricket_tag/nrf54l15/cpuapp` (board definition в `firmware/boards/cricket/cricket_tag`, ISP2454-LX, D-29) и отладочная nRF54L15 DK `nrf54l15dk/nrf54l15/cpuapp`; обе собирает `firmware/build.sh [board]`, см. [firmware/README.md](../firmware/README.md).
 
 ## Прошивка на устройство
 
@@ -70,7 +70,11 @@ nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54
 - Любой CMSIS-DAP / J-Link через probe-rs: `probe-rs run --chip nRF54L15_xxAA build/zephyr/zephyr.elf`.
 - У cricket-tag площадки SWD J3 снизу под аккумулятором: 1 VDD, 2 SWDIO, 3 SWCLK, 4 GND, шаг 2,54 мм, без отверстий. Прошивать до пайки аккумулятора, подпружиненными контактами или временными проводами (D-26).
 
-## Что установлено (проверено 2026-11-09)
+## Приложение (Flutter)
+
+Flutter 3.44+, Android SDK 36, JDK 17+; для iOS — Xcode (проверено с 27.2), плагины через Swift Package Manager, CocoaPods не нужен. Сборка, тесты и известная ошибка `flutter build ios --simulator` с Xcode 27 — в [app/README.md](../app/README.md#сборка).
+
+## Что установлено (проверено 2026-11-09, приложение — 2026-11-16)
 
 | Инструмент | Версия | Где |
 |---|---|---|
@@ -80,6 +84,10 @@ nrfutil sdk-manager toolchain launch --ncs-version v3.4.2 -- west build -b nrf54
 | SEGGER J-Link | 9.92 | `/Applications/SEGGER/JLink`, `JLinkExe` в `/usr/local/bin` |
 | probe-rs | 0.32 | поддерживает nRF54L15 |
 | dtc, poppler | brew | |
+| Flutter | 3.44.6 stable | для `app/` |
+| Xcode | 27.2 | сборка iOS |
+| Android SDK | платформы 36 и 37 | `~/Library/Android/sdk` |
+| JDK для Android | OpenJDK 21 | сборка `flutter build apk` |
 | VS Code | nRF Connect extension pack | |
 
 Casks `kicad` и `segger-jlink` вызывают `sudo` и требуют ввода пароля в терминале, автоматизировать это нельзя.
